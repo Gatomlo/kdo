@@ -64,3 +64,11 @@ export async function attempt(fn) {
     return null;
   }
 }
+
+// Apercu d'un lien marchand ; l'image est copiee dans l'app quand c'est possible
+// (sinon on garde son adresse).
+export async function linkPreview(url) {
+  const r = await get(`preview?url=${encodeURIComponent(url)}`);
+  if (r.image) r.image = await post('preview/image', { url: r.image }).then((x) => x.url, () => r.image);
+  return r;
+}

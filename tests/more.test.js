@@ -131,3 +131,14 @@ test('Secret Santa : moi, un compte, mon enfant ; le 2e tirage ignore « pas com
   assert.equal(r.ok, true, 'un seul tirage possible : la règle est ignorée');
   assert.equal(r.ignoredPrevious, true);
 });
+
+test('idée secrète : vendeur et photo', async () => {
+  const id = (await f.lea.post(`/api/ideas/${f.ids.marc}`, { title: 'Théière', shop: 'Marché de Namur', image: 'javascript:alert(1)' })).data.id;
+  let i = (await f.thomas.get(`/api/ideas/${f.ids.marc}`)).data.ideas.find((x) => x.id === id);
+  assert.equal(i.shop, 'Marché de Namur');
+  assert.equal(i.image, null, 'lien non http refusé');
+  await f.lea.patch(`/api/idea/${id}`, { title: 'Théière', image: 'https://exemple.be/t.jpg' });
+  i = (await f.thomas.get(`/api/ideas/${f.ids.marc}`)).data.ideas.find((x) => x.id === id);
+  assert.equal(i.image, 'https://exemple.be/t.jpg');
+  assert.equal(i.shop, null, 'champ vidé');
+});

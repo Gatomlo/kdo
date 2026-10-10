@@ -3,7 +3,7 @@
 // Le serveur n'envoie les donnees de cadeaux (item.gifts, offList) qu'aux offrants et
 // gestionnaires : l'interface se contente d'afficher ce qu'elle recoit.
 import { esc, on, toast, sheet, closeSheet, confirmSheet, eur, eurInput, fmtDate, stars, avatar, host } from './ui.js';
-import { get, post, patch, put, del, attempt, uploadPhoto } from './api.js';
+import { get, post, patch, put, del, attempt, uploadPhoto, linkPreview } from './api.js';
 import { S, reload, render, go } from './state.js';
 import { define } from './router.js';
 import { listCard, empty } from './cards.js';
@@ -383,7 +383,7 @@ on('click', 'prefill', async () => {
   if (!/^https?:\/\//.test(url)) { hint.textContent = 'Colle d’abord un lien commençant par http(s)://'; return; }
   hint.textContent = 'Lecture de la page…';
   try {
-    const r = await get(`preview?url=${encodeURIComponent(url)}`);
+    const r = await linkPreview(url);
     if (r.title && !form.title.value) form.title.value = r.title;
     if (r.image && !form.image.value) setPhoto(r.image);
     if (r.price && !form.price.value) form.price.value = r.price;
