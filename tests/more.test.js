@@ -119,3 +119,15 @@ test('transfert de liste : vers le compte de l’enfant, le parent reste gestion
   assert.equal(t.role, 'manager');
   assert.equal(t.canSeeGifts, true);
 });
+
+test('Secret Santa : moi, un compte, mon enfant ; le 2e tirage ignore « pas comme la dernière fois »', async () => {
+  const mk = async (t) => {
+    const ev = (await f.thomas.post('/api/events', { title: t, date: '2099-12-26', participants: [f.ids.thomas, f.ids.marc, f.ids.leon] })).data.id;
+    await f.thomas.post(`/api/events/${ev}/santa`);
+    return (await f.thomas.post(`/api/events/${ev}/santa/draw`)).data;
+  };
+  await mk('Noël A');
+  const r = await mk('Noël B');
+  assert.equal(r.ok, true, 'un seul tirage possible : la règle est ignorée');
+  assert.equal(r.ignoredPrevious, true);
+});

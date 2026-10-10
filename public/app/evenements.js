@@ -142,7 +142,7 @@ on('click', 'santa-draw', async () => {
     if (r.code !== 'managers') r = await attempt(() => Promise.reject(r));
     else r = (await confirmSheet({ title: 'Autoriser ce tirage ?', text: esc(r.message), ok: 'Tirer quand même' })) && await attempt(() => post(`events/${evId()}/santa/draw`, { ...body, allowManagers: true }));
   }
-  if (r) { toast(r.redraw ? 'Nouveau tirage effectué' : 'Tirage effectué : les enveloppes sont prêtes !'); reload(); }
+  if (r) { toast(`${r.redraw ? 'Nouveau tirage effectué' : 'Tirage effectué : les enveloppes sont prêtes !'}${r.ignoredPrevious ? ' (groupe trop petit pour éviter les duos du dernier tirage)' : ''}`); reload(); }
 });
 on('click', 'santa-reveal', async () => {
   if (!(await confirmSheet({ title: 'Dévoiler les duos ?', text: 'Tous les participants verront qui offrait à qui. C’est définitif.', ok: 'Dévoiler' }))) return;
