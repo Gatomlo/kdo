@@ -145,3 +145,25 @@ test('liens : seuls http(s) sont gardés', async () => {
   assert.equal(it.url, null);
   assert.equal(it.image, null);
 });
+
+test('liste surprise : invisible pour son destinataire, partout', async () => {
+  assert.equal((await f.lea.post('/api/lists', { title: 'Pour moi', surprise: true })).status, 400, 'pas pour soi');
+  const lid = (await f.lea.post('/api/lists', { title: 'Surprise de Marc', surprise: true, ownerId: f.ids.marc })).data.id;
+  const item = (await f.lea.post(`/api/lists/${lid}/items`, { title: 'Montre secrète' })).data.id;
+  // La créatrice est gestionnaire ; la famille réserve.
+  assert.equal((await f.lea.get(`/api/lists/${lid}`)).data.role, 'manager');
+  assert.equal((await f.thomas.post(`/api/items/${item}/reserve`, {})).status, 201);
+  // Marc : rien.
+  assert.equal((await f.marc.get(`/api/lists/${lid}`)).status, 404);
+  assert.equal((await f.marc.get('/api/lists')).data.some((l) => l.id === lid), false);
+  assert.equal((await f.marc.get('/api/search?q=montre')).data.items.length, 0);
+  assert.equal((await f.marc.post(`/api/lists/${lid}/items`, { title: 'x' })).status, 404);
+  assert.equal((await f.marc.patch(`/api/lists/${lid}`, { surprise: false })).status, 404);
+  const exp = (await f.marc.get('/api/export')).data;
+  if (exp && exp.lists) assert.equal(exp.lists.some((l) => l.id === lid), false);
+  // Dévoilée par la gestionnaire : Marc la voit comme sa liste.
+  assert.equal((await f.lea.patch(`/api/lists/${lid}`, { surprise: false })).status, 200);
+  const v = (await f.marc.get(`/api/lists/${lid}`)).data;
+  assert.equal(v.role, 'owner');
+  assert.equal(v.canSeeGifts, false);
+});

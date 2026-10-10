@@ -44,13 +44,16 @@ const allEvents = async () => { const e = await get('events'); return [...e.upco
 
 // ---------- Creation ----------
 const newList = (params) => ({
-  load: async () => ({ events: await allEvents(), me: await get('me') }),
+  load: async () => ({ events: await allEvents(), me: await get('me'), circle: await get('circle') }),
   view: (d) => {
     const owners = [{ id: d.me.id, name: `${d.me.name} (moi)` }, ...d.me.profiles];
     return {
       title: 'Nouvelle liste', back: '#/listes', tab: 'listes',
       body: `<form class="stack-lg" data-f="list-new"><div class="card stack">
-        ${owners.length > 1 ? `<label>Liste de<select name="ownerId">${owners.map((o) => `<option value="${o.id}">${esc(o.name)}</option>`).join('')}</select></label>` : ''}
+        <div id="owner-normal">${owners.length > 1 ? `<label>Liste de<select name="ownerId">${owners.map((o) => `<option value="${o.id}">${esc(o.name)}</option>`).join('')}</select></label>` : ''}</div>
+        <label class="check"><input type="checkbox" name="surprise" data-ch="surprise-toggle"> 🤫 Liste surprise : invisible pour la personne concernée</label>
+        <div id="owner-surprise" hidden><label>Liste surprise pour<select name="surpriseFor">${d.circle.members.filter((m) => m.id !== d.me.id).map((m) => `<option value="${m.id}">${esc(m.name)}</option>`).join('')}</select></label>
+          <p class="small muted">Elle ne la verra pas du tout ; tu en es gestionnaire et la famille peut réserver dessus.</p></div>
         ${listFields({ eventId: params && params.eid ? Number(params.eid) : null }, d.events)}
         <label class="check"><input type="checkbox" name="defaultCategories" checked> Créer les catégories habituelles (Livres, Jeux, Vêtements, Maison, Expériences)</label>
         </div><button class="btn main wide">Créer la liste</button></form>`,
@@ -59,8 +62,13 @@ const newList = (params) => ({
 });
 define('listes/nouvelle', newList());
 define('listes/nouvelle/evenement/:eid', { load: newList().load, view: (d, p) => newList(p).view(d) });
+on('change', 'surprise-toggle', (el) => {
+  document.getElementById('owner-normal').hidden = el.checked;
+  document.getElementById('owner-surprise').hidden = !el.checked;
+});
 on('submit', 'list-new', async (form, f) => {
-  const r = await attempt(() => post('lists', { ...f, ownerId: f.ownerId ? Number(f.ownerId) : undefined, eventId: f.eventId || null }));
+  const ownerId = f.surprise ? Number(f.surpriseFor) : f.ownerId ? Number(f.ownerId) : undefined;
+  const r = await attempt(() => post('lists', { ...f, surpriseFor: undefined, ownerId, eventId: f.eventId || null }));
   if (r) go(`#/listes/${r.id}`);
 });
 
@@ -86,7 +94,7 @@ define('listes/:id', {
     const info = q.info ? `<div class="infos stack tight">
         ${list.welcome ? `<p class="welcome">${esc(list.welcome)}</p>` : ''}
         ${d.event ? `<p class="small">📅 ${d.guest ? esc(d.event.title) : `<a href="#/evenements/${d.event.id}">${esc(d.event.title)}</a>`}</p>` : ''}
-        <p class="small muted">${d.canSeeGifts ? `🤫 Vue offrant : ne montre pas cet écran à ${esc(owner.name)}.${d.role === 'manager' ? ' Tu es gestionnaire : tu modifies les articles et gères les réservations.' : ''}` : `🙈 ${d.role === 'owner' ? 'Ta liste' : 'Tu es co-propriétaire'} : les réservations te restent cachées.`}</p>
+        <p class="small muted">${list.surprise ? `🤫 <b>Liste surprise</b> : ${esc(owner.name)} ne la voit pas. ` : ''}${d.canSeeGifts ? `🤫 Vue offrant : ne montre pas cet écran à ${esc(owner.name)}.${d.role === 'manager' ? ' Tu es gestionnaire : tu modifies les articles et gères les réservations.' : ''}` : `🙈 ${d.role === 'owner' ? 'Ta liste' : 'Tu es co-propriétaire'} : les réservations te restent cachées.`}</p>
         ${ficheRows.length ? `<dl class="fiche-dl">${ficheRows.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join('')}</dl>` : ''}
         <p class="row wrap small">${!d.guest && (d.role === 'owner' || d.role === 'manager') ? `<a href="#/fiche/${owner.id}">📏 ${ficheRows.length ? 'Modifier la fiche' : 'Remplir la fiche tailles'}</a>` : ''}
           ${d.role === 'viewer' && !d.guest ? `<a href="#/idees/${owner.id}">💡 Idées secrètes</a>` : ''}</p></div>` : '';
@@ -437,7 +445,9 @@ define('listes/:id/reglages', {
           <p class="small muted">Liste de <b>${esc(d.owner.name)}</b>. Créée pour quelqu’un avant qu’il ait son compte ? Donne-la-lui : il la verra comme sa liste (sans les réservations).</p>
           <form class="stack tight" data-f="list-transfer"><select name="memberId" aria-label="Nouveau destinataire">${d.members.filter((m) => m.id !== d.owner.id).map((m) => `<option value="${m.id}">${esc(m.name)}${m.hasAccount ? '' : ' (sans compte)'}</option>`).join('')}</select>
             <label class="check"><input type="checkbox" name="keepManager" checked> Je reste gestionnaire (je modifie et vois les réservations)</label>
-            <button class="btn">Changer de destinataire</button></form></section>` : ''}
+            <button class="btn">Changer de destinataire</button></form>
+          ${d.role !== 'owner' ? `<p class="small muted">${d.list.surprise ? `🤫 <b>Liste surprise</b> : ${esc(d.owner.name)} ne la voit pas.` : `${esc(d.owner.name)} voit cette liste (sans les réservations).`}</p>
+          <button class="btn ghost" data-a="list-surprise">${d.list.surprise ? `Montrer la liste à ${esc(d.owner.name)}` : `En faire une liste surprise (cachée à ${esc(d.owner.name)})`}</button>` : ''}</section>` : ''}
         ${shareSection(d)}
         <section class="card stack"><h2>Après la fête</h2>
           <p class="small muted">Marque les cadeaux reçus (bouton « Reçu ✓ » sur chaque article), puis reporte les autres dans une liste suivante : cette liste sera archivée, l’historique des cadeaux est gardé.</p>
@@ -517,6 +527,11 @@ on('click', 'cat-del', async (el) => {
 on('submit', 'role-add', async (form, f) => {
   if (!f.memberId) return;
   if (await attempt(() => post(`lists/${listId()}/roles`, { memberId: Number(f.memberId), role: f.role }))) { toast('Rôle ajouté'); reload(); }
+});
+on('click', 'list-surprise', async () => {
+  const surprise = !S.data.list.surprise;
+  if (!surprise && !(await confirmSheet({ title: `Montrer la liste à ${esc(S.data.owner.name)} ?`, text: 'La surprise sera dévoilée : la personne verra la liste et ses articles (jamais les réservations).', ok: 'Montrer' }))) return;
+  if (await attempt(() => patch(`lists/${listId()}`, { surprise }))) { toast(surprise ? 'Liste surprise' : 'Liste visible'); reload(); }
 });
 on('submit', 'list-transfer', async (form, f) => {
   const m = S.data.members.find((x) => x.id === Number(f.memberId));

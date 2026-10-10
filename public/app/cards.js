@@ -8,7 +8,7 @@ export function listCard(l) {
   const pill = g && g.total ? `<span class="pill ${g.taken >= g.total ? 'p-buy' : g.taken ? 'p-res' : 'p-free'}">${g.taken}/${g.total} pris</span>` : '';
   return `<a class="card lc" href="#/listes/${l.id}">
     <span class="cover" aria-hidden="true">${esc(l.cover)}</span>
-    <span class="grow"><b class="nm">${esc(l.title)}</b>
+    <span class="grow"><b class="nm">${l.surprise ? '<span title="Liste surprise : invisible pour la personne">🤫</span> ' : ''}${esc(l.title)}</b>
       <span class="meta">${avatar(l.owner, 'sm')} ${esc(l.owner.name)}${l.date ? ` · ${fmtDate(l.date, { day: 'numeric', month: 'short' })}` : ''} · ${plural(l.itemCount, 'article')}</span></span>
     ${ROLE[l.role] ? `<span class="pill p-mgr">${ROLE[l.role]}</span>` : ''}${pill}</a>`;
 }
