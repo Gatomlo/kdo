@@ -81,8 +81,9 @@ define('evenements/:id', {
           ${d.organizer ? `<p class="small muted">Organisé par ${esc(d.organizer)}</p>` : ''}
 </header>
         ${santa}
-        <section class="stack"><h2>Qui a déjà de quoi ?</h2><p class="small muted">Cadeaux réservés par destinataire (tes propres cadeaux ne sont jamais comptés).</p>
-          <div class="people">${d.coverage.length ? d.coverage.map((c) => `<div class="card row">${avatar(c, 'sm')}<span class="grow"><b>${esc(c.name)}</b><span class="meta">${c.lists ? plural(c.gifts, 'cadeau', 'cadeaux') : 'pas de liste'}</span></span></div>`).join('') : empty('Aucun autre participant.')}</div></section>
+        ${d.myListMissing ? `<p class="banner">📝 <span>Tu n’as pas encore de liste : la famille ne sait pas quoi t’offrir. <a href="#/listes/nouvelle/evenement/${ev.id}">Créer ma liste</a></span></p>` : ''}
+        <section class="stack"><h2>Qui a déjà de quoi ?</h2><p class="small muted">Cadeaux réservés par destinataire (tes propres cadeaux ne sont jamais comptés). La barre aide à n’oublier personne.</p>
+          <div class="people">${d.coverage.length ? coverageRows(d.coverage, d.isParticipant || d.isOrganizer) : empty('Aucun autre participant.')}</div></section>
         <section class="stack"><div class="between"><h2>Listes de l’événement</h2>${d.isParticipant ? `<a class="link" href="#/listes/nouvelle/evenement/${ev.id}">+ Ma liste</a>` : ''}</div>
           ${d.lists.length ? d.lists.map(listCard).join('') : empty('Aucune liste rattachée. Chacun peut y rattacher la sienne (création ou réglages de la liste).')}</section>
         <section class="stack"><h2>Participants (${d.participants.length})</h2><div class="row wrap">${d.participants.map((p) => `<span class="row small">${avatar(p, 'sm')}${esc(p.name)}</span>`).join('')}</div></section>
@@ -128,6 +129,26 @@ define('evenements/:id/secret-santa', {
       </div>`,
     };
   },
+});
+// Equilibre : barre relative au plus gate ; « à gâter » pour ceux qui ont une liste et le moins de cadeaux.
+function coverageRows(cov, canNudge) {
+  const withList = cov.filter((c) => c.lists);
+  const max = Math.max(1, ...withList.map((c) => c.gifts));
+  const min = Math.min(...withList.map((c) => c.gifts));
+  const uneven = withList.length > 1 && max - min >= 2;
+  const today = Date.now() - 20 * 3600 * 1000;
+  return cov.map((c) => {
+    let right = '';
+    if (c.noList && canNudge) right = c.nudgedAt > today ? '<span class="pill p-free">rappel envoyé</span>' : `<button class="btn ghost sm" data-a="nudge" data-id="${c.id}" data-name="${esc(c.name)}">🔔 Lui rappeler</button>`;
+    else if (uneven && c.lists && c.gifts === min) right = '<span class="pill p-hide">à gâter</span>';
+    const meta = c.lists ? plural(c.gifts, 'cadeau', 'cadeaux') : c.noList ? 'pas encore de liste' : 'liste générale (pas rattachée)';
+    return `<div class="card stack tight"><div class="row">${avatar(c, 'sm')}<span class="grow"><b>${esc(c.name)}</b><span class="meta">${meta}</span></span>${right}</div>
+      ${c.lists ? `<div class="gauge" role="meter" aria-valuemin="0" aria-valuemax="${max}" aria-valuenow="${c.gifts}" aria-label="Cadeaux pour ${esc(c.name)}"><i style="width:${(c.gifts / max) * 100}%"></i></div>` : ''}</div>`;
+  }).join('');
+}
+on('click', 'nudge', async (el) => {
+  const r = await attempt(() => post(`events/${evId()}/nudge/${el.dataset.id}`));
+  if (r) { toast(r.reached ? `Rappel envoyé à ${el.dataset.name}` : `${el.dataset.name} n’a pas activé les notifications : dis-le-lui de vive voix !`, !r.reached); reload(); }
 });
 const evId = () => S.data.event.id;
 on('submit', 'santa-settings', async (form, f) => { if (await attempt(() => patch(`events/${evId()}/santa`, f))) toast('Réglages enregistrés'); });

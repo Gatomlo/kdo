@@ -157,3 +157,18 @@ test('lien familial : réutilisable 48 h, sans e-mail ni admin ; QR code', async
   assert.match(q.svg, /^<svg/);
   assert.equal((await f.lea.get('/api/qr?text=javascript:1')).status, 400);
 });
+
+test('événement : qui n’a pas de liste, rappel une fois par jour, équilibre', async () => {
+  const ev = (await f.thomas.post('/api/events', { title: 'Pâques', date: '2099-04-05', participants: [f.ids.thomas, f.ids.lea, f.ids.marc, f.ids.leon] })).data.id;
+  const v = (await f.thomas.get(`/api/events/${ev}`)).data;
+  const leon = v.coverage.find((c) => c.id === f.ids.leon);
+  const marc = v.coverage.find((c) => c.id === f.ids.marc);
+  assert.equal(marc.noList, false, 'Marc a des listes générales');
+  assert.equal(leon.noList, true);
+  assert.equal((await f.lea.post(`/api/events/${ev}/nudge/${f.ids.marc}`)).status, 409);
+  const r = await f.lea.post(`/api/events/${ev}/nudge/${f.ids.leon}`);
+  assert.equal(r.status, 200);
+  assert.equal(typeof r.data.reached, 'number');
+  assert.equal((await f.lea.post(`/api/events/${ev}/nudge/${f.ids.leon}`)).status, 429);
+  assert.ok((await f.thomas.get(`/api/events/${ev}`)).data.coverage.find((c) => c.id === f.ids.leon).nudgedAt);
+});
