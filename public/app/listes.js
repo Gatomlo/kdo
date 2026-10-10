@@ -2,8 +2,8 @@
 // fiche article, reglages (infos, categories, roles, archivage).
 // Le serveur n'envoie les donnees de cadeaux (item.gifts, offList) qu'aux offrants et
 // gestionnaires : l'interface se contente d'afficher ce qu'elle recoit.
-import { esc, on, toast, confirmSheet, eur, eurInput, fmtDate, stars, avatar, host } from './ui.js';
-import { get, post, patch, put, del, attempt } from './api.js';
+import { esc, on, toast, sheet, confirmSheet, eur, eurInput, fmtDate, stars, avatar, host } from './ui.js';
+import { get, post, patch, put, del, attempt, uploadPhoto } from './api.js';
 import { S, reload, render, go } from './state.js';
 import { define } from './router.js';
 import { listCard, empty } from './cards.js';
@@ -91,12 +91,12 @@ define('listes/:id', {
         <div class="row wrap small"><label class="check">Priorité <select data-ch="f-prio">${[[0, 'toutes'], [2, '★★ et +'], [3, '★★★']].map(([v, l]) => `<option value="${v}" ${q.prio === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
         ${d.canSeeGifts ? `<label class="check"><input type="checkbox" data-ch="f-free" ${q.free ? 'checked' : ''}> Disponibles seulement</label>` : ''}</div></div>` : '';
     return {
-      title: list.title, back: '#/listes', tab: 'listes',
+      title: list.title, back: d.guest ? null : '#/listes', tab: 'listes',
       body: `<div class="stack-lg">
         <header class="stack">
           <div class="row"><span class="cover big" aria-hidden="true">${esc(list.cover)}</span>
             <div class="grow"><p class="meta">${avatar(owner, 'sm')} ${esc(owner.name)}${d.roles.filter((r) => r.role === 'co_owner').map((r) => ` & ${esc(r.name)}`).join('')}${list.date ? ` · ${fmtDate(list.date)}` : ''}${list.archived ? ' · <span class="pill p-buy">archivée</span>' : ''}</p>
-            ${d.event ? `<p class="small">Événement : <a href="#/evenements/${d.event.id}">${esc(d.event.title)}</a></p>` : ''}</div></div>
+            ${d.event ? `<p class="small">Événement : ${d.guest ? esc(d.event.title) : `<a href="#/evenements/${d.event.id}">${esc(d.event.title)}</a>`}</p>` : ''}</div></div>
           ${list.welcome ? `<p class="card welcome">${esc(list.welcome)}</p>` : ''}
           ${banners}
           ${d.canEdit ? `<div class="row wrap"><a class="btn main" href="#/listes/${list.id}/article/nouveau">+ Ajouter un article</a><a class="btn ghost" href="#/listes/${list.id}/reglages">Réglages</a></div>` : ''}
@@ -118,7 +118,7 @@ function itemCard(i, d, order) {
   const links = [i.url, i.url2].filter(Boolean).map((u) => `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(host(u))} ↗</a>`).join('');
   const pos = order.indexOf(i.id);
   return `<article class="item${g && g.status === 'bought' ? ' done' : ''}" data-item="${i.id}" ${d.canEdit ? 'draggable="true"' : ''}>
-    <div class="thumb">${i.image ? `<img src="${esc(i.image)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : '🎁'}</div>
+    <div class="thumb">${i.image ? `<button class="zoom" data-a="photo-zoom" data-src="${esc(i.image)}" data-title="${esc(i.title)}" aria-label="Agrandir la photo"><img src="${esc(i.image)}" alt="" loading="lazy" referrerpolicy="no-referrer"></button>` : '🎁'}</div>
     <div class="body">
       <div class="between"><b class="title">${esc(i.title)}</b>${g ? `<span class="pill ${STATUS[g.status][1]}">${STATUS[g.status][0]}</span>` : ''}</div>
       <div class="meta"><span class="stars" title="Priorité ${i.priority}/3">${stars(i.priority)}</span>
@@ -177,6 +177,7 @@ function offListSection(d) {
 }
 
 const listId = () => S.data.list.id;
+on('click', 'photo-zoom', (el) => sheet(`<h3>${esc(el.dataset.title)}</h3><img class="photo-big" src="${esc(el.dataset.src)}" alt="Photo : ${esc(el.dataset.title)}" referrerpolicy="no-referrer"><div class="row end"><button class="btn ghost" data-a="close-sheet">Fermer</button></div>`));
 const cardOf = (el) => el.closest('[data-item]');
 
 on('click', 'reserve', async (el) => {
@@ -256,14 +257,43 @@ define('listes/:id/article/:itemId', {
         <label class="check"><input type="checkbox" name="groupGift" data-ch="group-toggle" ${it.groupGift ? 'checked' : ''}> Cadeau commun (plusieurs participants se partagent le prix)</label>
         <label id="qty-field" ${it.groupGift ? 'hidden' : ''}>Quantité souhaitée<input name="quantity" type="number" min="1" max="99" value="${it.quantity || 1}"></label>
         <label>Taille, couleur, précisions<textarea name="description" maxlength="2000">${esc(it.description || '')}</textarea></label>
-        <label>Photo (lien d’une image)<input name="image" type="url" value="${esc(it.image || '')}"></label>
-        <img id="img-preview" class="preview" alt="Aperçu" referrerpolicy="no-referrer" ${it.image ? `src="${esc(it.image)}"` : 'hidden'}>
+        <fieldset><legend>Photo</legend>
+          <div class="row wrap"><img id="img-preview" class="preview" alt="Aperçu de la photo" referrerpolicy="no-referrer" ${it.image ? `src="${esc(it.image)}"` : 'hidden'}>
+            <label class="btn ghost sm file">📷 ${it.image ? 'Changer la photo' : 'Ajouter une photo'}<input type="file" accept="image/*" data-ch="photo-file" hidden></label>
+            <button type="button" class="btn danger-t sm" data-a="photo-clear" ${it.image ? '' : 'hidden'}>Retirer</button></div>
+          <p class="small muted" id="photo-hint" hidden></p>
+          <input type="hidden" name="image" value="${esc(it.image || '')}">
+          <details><summary>…ou le lien d’une image sur internet</summary><input type="url" data-in="photo-url" placeholder="https://…/image.jpg" value="${esc(it.image && !it.image.startsWith('photos/') ? it.image : '')}"></details>
+        </fieldset>
         <label>Autre lien marchand<input name="url2" type="url" value="${esc(it.url2 || '')}"></label>
       </div>
       <div class="row wrap"><button class="btn main grow">Enregistrer</button>${d.item ? '' : '<button type="button" class="btn ghost" data-a="item-save-again">Enregistrer et ajouter un autre</button>'}</div></form>`,
     };
   },
 });
+// Photo de l'article : deposee (reduite puis envoyee) ou lien d'image.
+function setPhoto(src) {
+  const form = document.querySelector('form[data-f=item]');
+  form.image.value = src || '';
+  const img = document.getElementById('img-preview');
+  img.hidden = !src;
+  if (src) img.src = src; else img.removeAttribute('src');
+  document.querySelector('[data-a=photo-clear]').hidden = !src;
+}
+on('change', 'photo-file', async (el) => {
+  const file = el.files && el.files[0];
+  if (!file) return;
+  const hint = document.getElementById('photo-hint');
+  hint.hidden = false;
+  hint.textContent = 'Envoi de la photo…';
+  try {
+    setPhoto(await uploadPhoto(file));
+    hint.textContent = 'Photo prête : pense à enregistrer.';
+  } catch (e) { hint.textContent = e.message; }
+  el.value = '';
+});
+on('click', 'photo-clear', () => setPhoto(''));
+on('input', 'photo-url', (el) => { const v = el.value.trim(); if (!v || /^https?:\/\//.test(v)) setPhoto(v); });
 on('change', 'group-toggle', (el) => { document.getElementById('qty-field').hidden = el.checked; });
 on('click', 'prefill', async () => {
   const form = document.querySelector('form[data-f=item]');
@@ -275,7 +305,7 @@ on('click', 'prefill', async () => {
   try {
     const r = await get(`preview?url=${encodeURIComponent(url)}`);
     if (r.title && !form.title.value) form.title.value = r.title;
-    if (r.image) { form.image.value = r.image; const img = document.getElementById('img-preview'); img.src = r.image; img.hidden = false; }
+    if (r.image && !form.image.value) setPhoto(r.image);
     if (r.price && !form.price.value) form.price.value = r.price;
     hint.textContent = r.title || r.image ? 'Infos récupérées : vérifie-les avant d’enregistrer.' : 'Rien trouvé sur cette page : remplis à la main.';
   } catch (e) { hint.textContent = `Impossible de lire cette page (${e.message})`; }
@@ -307,9 +337,9 @@ on('click', 'item-save-again', () => {
 // ---------- Reglages ----------
 define('listes/:id/reglages', {
   load: async (p) => {
-    const [v, circle, events] = await Promise.all([get(`lists/${p.id}`), get('circle'), allEvents()]);
+    const [v, circle, events, share] = await Promise.all([get(`lists/${p.id}`), get('circle'), allEvents(), get(`lists/${p.id}/share`)]);
     if (!v.canEdit) throw new Error('Tu ne peux pas modifier cette liste.');
-    return { ...v, members: circle.members, events };
+    return { ...v, members: circle.members, events, share };
   },
   view: (d) => {
     const taken = new Set([d.owner.id, S.me.id, ...d.roles.map((r) => r.id)]);
@@ -330,12 +360,49 @@ define('listes/:id/reglages', {
           ${d.roles.map((r) => `<div class="between"><span>${esc(r.name)} <span class="pill p-mgr">${label[r.role]}</span></span>${r.id !== S.me.id ? `<button class="linkbtn" data-a="role-del" data-id="${r.id}">retirer</button>` : ''}</div>`).join('')}
           <form class="row wrap" data-f="role-add"><select name="memberId" class="grow">${d.members.filter((m) => !taken.has(m.id)).map((m) => `<option value="${m.id}">${esc(m.name)}${m.hasAccount ? '' : ' (sans compte)'}</option>`).join('')}</select>
             <select name="role"><option value="co_owner">co-propriétaire</option><option value="manager">gestionnaire</option></select><button class="btn sm">Ajouter</button></form></section>
+        ${shareSection(d)}
         <section class="row wrap"><button class="btn ghost" data-a="list-archive">${d.list.archived ? 'Réactiver la liste' : 'Archiver la liste'}</button>
           ${d.role !== 'co_owner' ? '<button class="btn danger" data-a="list-del">Supprimer la liste</button>' : ''}</section>
       </div>`,
     };
   },
 });
+// ---------- Partage hors du cercle ----------
+function shareSection(d) {
+  const s = d.share;
+  const intro = '<p class="small muted">Pour le parrain, un oncle, une grand-mère… qui n’ont pas de compte : avec ce lien, ils voient <b>cette liste seulement</b> en vue offrant et peuvent réserver. Les réservations restent cachées au destinataire.</p>';
+  if (!s.enabled) return `<section class="card stack"><h2>Partager hors du cercle</h2>${intro}<button class="btn plum" data-a="share-on">🔗 Créer un lien de partage</button></section>`;
+  return `<section class="card stack"><h2>Partager hors du cercle</h2>${intro}
+    <input readonly value="${esc(s.url)}" class="select-all" aria-label="Lien de partage">
+    <div class="row wrap"><button class="btn main sm" data-a="copy" data-text="${esc(s.url)}">Copier le lien</button>
+      ${navigator.share ? `<button class="btn ghost sm" data-a="share-native" data-url="${esc(s.url)}">Envoyer…</button>` : ''}
+      <a class="btn ghost sm" href="https://wa.me/?text=${encodeURIComponent(`Ma liste de cadeaux « ${d.list.title} » : ${s.url}`)}" target="_blank" rel="noopener noreferrer">WhatsApp</a></div>
+    <form class="stack tight" data-f="share-pass"><label>Mot de passe ${s.hasPassword ? '<span class="pill p-free">actif</span>' : '<span class="muted">(facultatif)</span>'}
+      <input name="password" type="text" autocomplete="off" minlength="4" maxlength="100" placeholder="${s.hasPassword ? 'Nouveau mot de passe' : 'ex. sapin2026'}"></label>
+      <p class="small muted">${s.hasPassword ? 'Le lien seul ne suffit pas : l’invité doit aussi saisir le mot de passe (à lui donner à part). Le changer déconnecte les invités déjà entrés.' : 'Sans mot de passe, toute personne qui a le lien peut voir la liste.'}</p>
+      <div class="row wrap"><button class="btn sm">${s.hasPassword ? 'Changer le mot de passe' : 'Protéger par mot de passe'}</button>${s.hasPassword ? '<button type="button" class="btn ghost sm" data-a="share-pass-off">Retirer le mot de passe</button>' : ''}</div></form>
+    ${s.guests.length ? `<p class="tag">Invités (${s.guests.length})</p>${s.guests.map((g) => `<div class="between"><span class="row small">${avatar(g, 'sm')}${esc(g.name)}${g.email ? ` <span class="muted">· ${esc(g.email)}</span>` : ''}</span><button class="linkbtn" data-a="guest-del" data-id="${g.id}" data-name="${esc(g.name)}">retirer</button></div>`).join('')}` : '<p class="small muted">Personne n’est encore venu par ce lien.</p>'}
+    <div class="row wrap"><button class="btn ghost sm" data-a="share-renew">Nouveau lien</button><button class="btn danger-t sm" data-a="share-off">Désactiver le partage</button></div></section>`;
+}
+const shareCall = async (fn, msg) => { if (await attempt(fn)) { if (msg) toast(msg); reload(); } };
+on('click', 'share-on', () => shareCall(() => post(`lists/${listId()}/share`), 'Lien de partage créé'));
+on('click', 'share-native', (el) => navigator.share({ title: S.data.list.title, text: `Ma liste de cadeaux « ${S.data.list.title} »`, url: el.dataset.url }).catch(() => {}));
+on('submit', 'share-pass', (form, f) => { if (f.password.trim()) shareCall(() => put(`lists/${listId()}/share/password`, { password: f.password.trim() }), 'Mot de passe enregistré'); });
+on('click', 'share-pass-off', () => shareCall(() => put(`lists/${listId()}/share/password`, { password: null }), 'Mot de passe retiré'));
+on('click', 'share-renew', async () => {
+  if (!(await confirmSheet({ title: 'Créer un nouveau lien ?', text: 'L’ancien lien ne permettra plus d’entrer. Les invités déjà venus gardent leur accès.', ok: 'Nouveau lien' }))) return;
+  shareCall(() => post(`lists/${listId()}/share`, { renew: true }), 'Nouveau lien créé');
+});
+on('click', 'share-off', async () => {
+  if (!(await confirmSheet({ title: 'Désactiver le partage ?', text: 'Le lien ne fonctionnera plus et les invités perdent l’accès (leurs réservations restent visibles de la famille).', ok: 'Désactiver', danger: true }))) return;
+  shareCall(() => del(`lists/${listId()}/share`), 'Partage désactivé');
+});
+on('click', 'guest-del', async (el) => {
+  if (!(await confirmSheet({ title: `Retirer ${esc(el.dataset.name)} ?`, text: 'Ses réservations et messages sur cette liste seront supprimés.', ok: 'Retirer', danger: true }))) return;
+  shareCall(() => del(`lists/${listId()}/share/guests/${el.dataset.id}`), 'Invité retiré');
+});
+document.addEventListener('focusin', (e) => { if (e.target.classList && e.target.classList.contains('select-all')) e.target.select(); });
+
 on('submit', 'list-save', async (form, f) => { if (await attempt(() => patch(`lists/${listId()}`, { ...f, eventId: f.eventId || null }))) toast('Liste enregistrée'); });
 on('submit', 'cat-add', async (form, f) => { if (await attempt(() => post(`lists/${listId()}/categories`, { name: f.name }))) reload(); });
 on('submit', 'cat-rename', async (form, f) => { if (await attempt(() => patch(`categories/${form.dataset.id}`, { name: f.name }))) toast('Catégorie renommée'); });

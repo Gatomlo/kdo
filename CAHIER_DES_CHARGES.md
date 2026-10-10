@@ -19,7 +19,7 @@ Permettre aux membres d'une famille de :
 - Un **administrateur du cercle** invite les membres par un **lien d'invitation** à transmettre (envoyé par e-mail si possible).
 - **Profils sans compte** (enfants, personnes âgées sans e-mail) : créés par un adulte qui en devient automatiquement **gestionnaire**.
 - **Tableau de bord** : toutes les listes de la famille, les événements à venir, mes réservations, mon Secret Santa.
-- Lien de partage externe (personne hors cercle, ex. parrain) : **optionnel**, désactivé par défaut ; l'invité externe s'identifie par prénom (+ e-mail facultatif).
+- Lien de partage externe (personne hors cercle : parrain, tonton, grand-mère) : **optionnel**, désactivé par défaut, par liste ; **mot de passe facultatif** (le lien seul ne suffit alors pas) ; l'invité externe s'identifie par prénom (+ e-mail facultatif) et ne voit que cette liste, en vue offrant.
 
 ## 3. Rôles sur une liste
 
@@ -38,7 +38,7 @@ Permettre aux membres d'une famille de :
 ### 4.1 Listes, catégories, articles
 - Plusieurs listes par personne : titre, occasion, date, couverture, message d'accueil, rattachement facultatif à un événement.
 - **Catégories par liste**, nommées librement, réordonnables (ex. Livres, Jeux, Vêtements, Maison, Expériences).
-- Article : nom, catégorie, lien(s) marchand(s), prix indicatif, photo, description/taille/couleur, priorité (★ à ★★★), quantité souhaitée.
+- Article : nom, catégorie, lien(s) marchand(s), prix indicatif, photo (déposée depuis le téléphone ou lien d'image), description/taille/couleur, priorité (★ à ★★★), quantité souhaitée.
 - Pré-remplissage depuis une URL (Open Graph : titre, image, prix) quand possible.
 - Tri par glisser-déposer, filtres par catégorie / priorité / disponibilité.
 - Archivage de la liste après l'événement.
@@ -124,5 +124,4 @@ Règle clé : toute requête de lecture de `Reservation`, `Comment`, `OffListGif
 ## 7. Points ouverts
 
 - Nom définitif de l'application (adresse : `/hotte` sur le domaine de la passerelle, pas de sous-domaine).
-- Lien de partage externe (hors cercle) : utile ou non ? (non codé)
-- E-mails : aucun envoi en prod aujourd'hui ; un SMTP activerait le lien de connexion et les notifications (§4.5).
+- E-mails : aucun envoi en prod aujourd'hui ; un SMTP (saisi par l'administrateur dans l'app) active le lien de connexion et les notifications (§4.5).

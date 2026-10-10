@@ -194,3 +194,8 @@ details > summary { cursor: pointer; font-weight: 700; color: var(--plum); font-
 @media (min-width: 700px) { .sheet-bg { align-items: center } .sheet { border-radius: 22px; max-width: 520px } }
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: 84px; z-index: 20; background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 12px; font-size: .9rem; max-width: calc(100% - 32px) }
 .toast.err { background: var(--ribbon); color: #fff }
+
+/* Bouton de depot de photo (label contenant le champ fichier). */
+label.btn.file { flex-direction: row; color: var(--ink); cursor: pointer }
+.thumb .zoom { border: 0; padding: 0; background: none; width: 100%; height: 100%; cursor: zoom-in }
+.photo-big { width: 100%; max-height: 70vh; object-fit: contain; border-radius: 12px; background: var(--sunk) }

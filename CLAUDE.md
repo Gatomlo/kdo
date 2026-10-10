@@ -4,7 +4,7 @@
 Outil familial privé : listes de souhaits par catégories, réservation des cadeaux cachée au destinataire, événements familiaux avec tirage Secret Santa secret. Spécifications : `CAHIER_DES_CHARGES.md`. Maquette d'origine : `maquette/index.html`.
 
 ## État (au 2026-10-10)
-Étapes 1 à 4 du cahier codées, et l'essentiel de la 5 (PWA, pré-remplissage par URL, archivage, export filtré, mode sombre). Non fait : lien de partage externe (point ouvert §7), envoi de photos (photo = lien d'image). Pas encore déployé.
+Étapes 1 à 5 du cahier codées : y compris partage hors cercle (lien + mot de passe facultatif), dépôt de photos, réglages e-mail dans l'app. Pas encore déployé.
 
 ## Stack
 Même socle que Le Cabas (`../listes-courses`, s'en inspirer) et MyLittleLibraryV2 : Node ≥ 22.5, Express 4, `node:sqlite` (base unique `data/hotte.db`), nodemailer. Front : SPA en modules ES sans framework ni build (`public/app/`), navigation par `#/…`, CSP stricte.
@@ -12,7 +12,7 @@ Même socle que Le Cabas (`../listes-courses`, s'en inspirer) et MyLittleLibrary
 ## Fichiers clés
 - `server.js` : exporte `app` (listen seulement si lancé directement), page `index.html` avec `{{ROOT}}` → `<base href>`, API sur `/api`.
 - `lib/db.js` : connexion, `tx` (imbriquable), `inList` (ids entiers pour `IN`), `MIGRATIONS` (`PRAGMA user_version` ; ne jamais modifier une entrée déployée).
-- `lib/access.js` : **rôles et anti-spoiler** (`roleOn`, `listAccess`, `requireGiver`, `actorIds`, `hiddenListIds`). `lib/lists.js` (listes, articles, réservations, participations, discussions, hors liste, `view` = vue filtrée). `lib/events.js` (événements, Secret Santa, enveloppes, messages). `lib/santa.js` (tirage pur, testé). `lib/circle.js` (membres, profils, invitations). `lib/auth.js` (copié du Cabas). `lib/notify.js`, `lib/mailer.js`, `lib/preview.js` (Open Graph, garde-fou SSRF), `lib/exporter.js`, `lib/api.js` (toutes les routes).
+- `lib/access.js` : **rôles et anti-spoiler** (`roleOn`, `listAccess`, `requireGiver`, `actorIds`, `hiddenListIds`). `lib/lists.js` (listes, articles, réservations, participations, discussions, hors liste, `view` = vue filtrée). `lib/events.js` (événements, Secret Santa, enveloppes, messages). `lib/santa.js` (tirage pur, testé). `lib/circle.js` (membres, profils, invitations). `lib/auth.js` (copié du Cabas). `lib/notify.js`, `lib/mailer.js`, `lib/preview.js` (Open Graph, garde-fou SSRF), `lib/exporter.js`, `lib/share.js` (lien de partage, mot de passe, invités, `guestAllowed`), `lib/photos.js` (dépôt, vérification du type, nettoyage), `lib/api.js` (toutes les routes).
 - `public/app/` : `main.js` (cadre, routeur), `router.js` (`define(pattern, {load, view})`), `ui.js`, `api.js`, `state.js`, un fichier par domaine (`accueil`, `listes`, `evenements`, `cercle`, `connexion`, `install`), `cards.js`.
 
 ## Règles non évidentes
@@ -23,6 +23,9 @@ Même socle que Le Cabas (`../listes-courses`, s'en inspirer) et MyLittleLibrary
 - **Pas d'e-mail en prod** (comme Le Cabas) : connexion par mot de passe, invitations et réinitialisations par **liens à copier**. Si `SMTP_HOST`/`HOTTE_MAIL` sont définis : lien de connexion par e-mail et notifications (§4.5), sinon ignorées.
 - Rappels J-7 : vérifiés au fil des requêtes (au plus 1×/h), **pas de `setInterval`** (processus partagé de la passerelle).
 - CSP : aucun script ni `onclick` en ligne → `data-a` / `data-f` / `data-ch` traités par délégation (`ui.js`). Texte affiché : toujours `esc()`. Liens d'articles : http(s) seulement (`webUrl`).
+- **Invités hors cercle** : `members.guest_list_id` (+ `guest_email` facultatif), sans compte. Session valable tant que `lists.share_token` existe ; route permise seulement si `share.guestAllowed` (sa liste, actions d'offrant). Même prénom = même invité. Mot de passe de liste (`share_password_hash`) : le changer supprime les sessions des invités. Exclus partout ailleurs (`guest_list_id IS NULL` : cercle, événements, rôles, réattribution).
+- **Photos** : réduites par le navigateur (1200 px, JPEG), `POST /api/photos` en binaire (seule exception à `jsonOnly`), type vérifié par les octets, `data/photos/<32 hex>.jpg` servi sans connexion sur `/photos/…` ; `items.image` = `photos/…` ou lien http(s). Fichier non référencé depuis 24 h supprimé à chaque dépôt.
+- **Réglages** (table `meta` : `getSetting`/`setSetting`) : `smtp` et `public_url`, saisis par l'admin dans l'app (#/reglages). Priorité : variable d'environnement > réglage > défaut. Mot de passe SMTP jamais renvoyé à l'interface.
 - Prix en centimes. Dates `AAAA-MM-JJ`.
 
 ## Commandes
@@ -31,7 +34,7 @@ Même socle que Le Cabas (`../listes-courses`, s'en inspirer) et MyLittleLibrary
 - `npm run set-password -- <email> <mdp>` (secours) · `node scripts/backup.js` (copie datée de la base dans `data/backups/`, 30 gardées).
 
 ## Déploiement (Infomaniak, via node-gateway)
-Dossier `apps/hotte` de la passerelle → servi sur `/hotte` (local : jonction `node-gateway/apps/hotte` → ce dossier). Envoyer `server.js`, `package.json`, `package-lock.json`, `lib/`, `public/`, `scripts/` (jamais `data/`), `npm install --omit=dev`, redémarrer. Variable recommandée : `HOTTE_PUBLIC_URL` (ex. `https://<domaine>/hotte`, adresse des liens d'invitation). Migrations automatiques au démarrage. Sauvegarde : tâche planifiée `node scripts/backup.js`.
+Dossier `apps/hotte` de la passerelle → servi sur `/hotte` (local : jonction `node-gateway/apps/hotte` → ce dossier). Envoyer `server.js`, `package.json`, `package-lock.json`, `lib/`, `public/`, `scripts/` (jamais `data/`), `npm install --omit=dev`, redémarrer. Après la mise en ligne : Cercle → Réglages de l'app → adresse publique (`https://<domaine>/hotte`) et, si voulu, SMTP (bouton d'e-mail d'essai). Les photos sont dans `data/photos/` (à sauvegarder avec la base). Migrations automatiques au démarrage. Sauvegarde : tâche planifiée `node scripts/backup.js`.
 
 ## Méthode de travail
 Réponses en français, concises. Tester par l'API (`npm test`) avant l'interface. Commit après chaque fonctionnalité validée.

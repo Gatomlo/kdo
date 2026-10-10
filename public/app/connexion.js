@@ -5,9 +5,43 @@ import { esc, on, toast } from './ui.js';
 import { get, post, attempt } from './api.js';
 import { S, render, go } from './state.js';
 
-const pending = { invite: null, invitation: null, reset: null, sent: null, mode: null, options: { mail: false, setup: false } };
+const pending = { invite: null, invitation: null, reset: null, share: null, shareInfo: null, sent: null, mode: null, options: { mail: false, setup: false } };
 
-export function setPending({ invite, reset }) { pending.invite = invite || null; pending.reset = reset || null; }
+export function setPending({ invite, reset, share }) { pending.invite = invite || null; pending.reset = reset || null; pending.share = share || null; }
+
+// ---------- Invite externe (lien de partage d'une liste) ----------
+export async function loadShare() {
+  if (!pending.share) return;
+  pending.shareInfo = await get(`share/${encodeURIComponent(pending.share)}`).catch(() => null);
+  if (!pending.shareInfo) { toast('Ce lien de partage n’existe pas ou a été désactivé.', true); pending.share = null; }
+}
+// Ecran d'entree a afficher ? Un membre du cercle va directement a la liste.
+export function sharePending() {
+  const info = pending.shareInfo;
+  if (!info) return null;
+  if (S.me && (!S.me.guest || S.me.listId === info.listId)) { pending.share = null; pending.shareInfo = null; return { go: `#/listes/${info.listId}` }; }
+  return { view: true };
+}
+export function guestJoinView() {
+  const i = pending.shareInfo;
+  return {
+    noNav: true, title: '',
+    body: `<div class="hero"><div class="logo">${esc(i.cover)}</div><h1>${esc(i.title)}</h1><p class="muted">La liste de cadeaux de <b>${esc(i.ownerName)}</b>, partagée avec toi.</p></div>
+      <form class="card stack narrow" data-f="guest-join">
+        <label>Ton prénom<input name="name" required maxlength="40" autocomplete="given-name" placeholder="ex. Parrain Paul"></label>
+        <label>Ton e-mail <span class="muted">(facultatif : pour être prévenu si un cadeau réservé change)</span><input name="email" type="email" autocomplete="email"></label>
+        ${i.needsPassword ? '<label>Mot de passe de la liste<input name="password" type="password" required autocomplete="off"></label>' : ''}
+        <button class="btn main wide">Voir la liste</button>
+        <p class="small muted">Tu reviens ? Indique le même prénom pour retrouver tes réservations. ${esc(i.ownerName)} ne voit pas ce qui est réservé.</p></form>`,
+  };
+}
+on('submit', 'guest-join', async (form, f) => {
+  const r = await attempt(() => post(`share/${encodeURIComponent(pending.share)}/join`, { name: f.name, email: f.email, password: f.password }));
+  if (!r) return;
+  pending.share = null; pending.shareInfo = null;
+  S.me = await get('me');
+  go(`#/listes/${r.listId}`);
+});
 export const resetPending = () => !!pending.reset;
 export async function loadOptions() {
   pending.options = await get('auth/options').catch(() => pending.options);

@@ -4,7 +4,7 @@ import { esc, on, toast, avatar } from './ui.js';
 import { get, post, ApiError } from './api.js';
 import { S, setReloader, setRenderer, go } from './state.js';
 import { match } from './router.js';
-import { loginView, setPending, loadOptions, loadInvitation, resetPending } from './connexion.js';
+import { loginView, setPending, loadOptions, loadInvitation, resetPending, loadShare, sharePending, guestJoinView } from './connexion.js';
 import './install.js'; // tot : retient l'invite d'installation du navigateur
 import './accueil.js';
 import './listes.js';
@@ -22,9 +22,11 @@ const NAV = [
 
 function shell(v) {
   const tab = v.tab ?? S.route[0] ?? '';
-  const nav = v.noNav ? '' : `<nav class="tabs" aria-label="Navigation principale">${NAV.map(([k, t, svg]) => `<a href="#/${k}" ${tab === k ? 'aria-current="page"' : ''}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${svg}</svg><span>${t}</span></a>`).join('')}</nav>`;
-  const me = S.me && !v.noNav ? `<a href="#/moi" class="me" aria-label="Mon compte">${avatar(S.me)}</a>` : '';
-  app.className = 'shell' + (v.noNav ? ' nonav' : '');
+  const nav = v.noNav || (S.me && S.me.guest) ? '' : `<nav class="tabs" aria-label="Navigation principale">${NAV.map(([k, t, svg]) => `<a href="#/${k}" ${tab === k ? 'aria-current="page"' : ''}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${svg}</svg><span>${t}</span></a>`).join('')}</nav>`;
+  const me = !S.me || v.noNav ? '' : S.me.guest
+    ? `<span class="row small">${avatar(S.me, 'sm')}${esc(S.me.name)}</span><button class="btn ghost sm" data-a="logout">Ce n’est pas moi</button>`
+    : `<a href="#/moi" class="me" aria-label="Mon compte">${avatar(S.me)}</a>`;
+  app.className = 'shell' + (v.noNav || (S.me && S.me.guest) ? ' nonav' : '');
   const header = v.noNav && !v.title ? '' : `<header class="top">${v.back ? `<a class="back" href="${esc(v.back)}" aria-label="Retour">‹</a>` : ''}
       ${v.title ? `<h2>${esc(v.title)}${v.sub ? `<small>${esc(v.sub)}</small>` : ''}</h2>` : '<a class="brand" href="#/">La <i>Hotte</i></a>'}
       ${v.right || ''}${me}</header>`;
@@ -36,7 +38,12 @@ let current = null; // { route, params }
 
 async function load() {
   const path = location.hash.replace(/^#\/?/, '').replace(/\/$/, '');
+  const sp = sharePending();
+  if (sp && sp.go) { go(sp.go); return; }
+  if (sp) { S.route = ['partage']; shell(guestJoinView()); return; }
   if (!S.me || resetPending()) { S.route = ['login']; shell(loginView()); return; }
+  // Invite externe : sa liste seulement.
+  if (S.me.guest && path !== `listes/${S.me.listId}`) { go(`#/listes/${S.me.listId}`); return; }
   current = match(path);
   if (!current) { go('#/'); return; }
   S.route = path.split('/');
@@ -57,7 +64,8 @@ setReloader(async () => {
 });
 setRenderer(() => {
   const y = window.scrollY;
-  if (!S.me || resetPending()) shell(loginView());
+  if (S.route[0] === 'partage') shell(guestJoinView());
+  else if (!S.me || resetPending()) shell(loginView());
   else if (current) shell(current.route.view(S.data, current.params));
   window.scrollTo(0, y);
 });
@@ -81,15 +89,15 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catc
 async function boot() {
   const params = new URLSearchParams(location.search);
   const login = params.get('login');
-  setPending({ invite: params.get('invite'), reset: params.get('reset') });
-  if (login || params.get('invite') || params.get('reset')) history.replaceState(null, '', location.pathname + location.hash);
+  setPending({ invite: params.get('invite'), reset: params.get('reset'), share: params.get('partage') });
+  if (login || params.get('invite') || params.get('reset') || params.get('partage')) history.replaceState(null, '', location.pathname + location.hash);
   await loadOptions();
   let loginError = null;
   if (login) {
     try { S.me = await post('auth/verify', { token: login }); } catch (e) { loginError = e.message; }
   }
   if (!S.me) S.me = await get('me').catch(() => null);
-  await loadInvitation();
+  await Promise.all([loadInvitation(), loadShare()]);
   await load();
   if (loginError && !S.me) toast(loginError, true);
 }

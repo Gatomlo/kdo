@@ -7,6 +7,7 @@ const express = require('express');
 const security = require('./lib/security');
 const auth = require('./lib/auth');
 const { router } = require('./lib/api');
+const photos = require('./lib/photos');
 
 if (require.main === module) {
   const fatal = (kind) => (err) => { console.error(`${kind} :`, err); process.exit(1); };
@@ -24,6 +25,9 @@ app.use(express.json({ limit: '1mb' }));
 
 // Interface : fichiers toujours revalides (304 si inchanges), sauf la page elle-meme.
 app.use(express.static(PUBLIC_DIR, { index: false, setHeaders: (res) => res.set('Cache-Control', 'no-cache') }));
+
+// Photos des articles : nom aleatoire et definitif, gardees par le navigateur.
+app.use('/photos', express.static(photos.DIR, { index: false, immutable: true, maxAge: '365d' }));
 
 app.use('/api', auth.loadUser, security.jsonOnly, router());
 app.use('/api', (req, res) => res.status(404).json({ error: 'Adresse inconnue.' }));
