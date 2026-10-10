@@ -47,7 +47,7 @@ define('evenements/:id/modifier', {
   load: async (p) => ({ ...(await get(`events/${p.id}/edit`)), members: (await get('circle')).members }),
   view: (d) => ({
     title: 'Modifier l’événement', back: `#/evenements/${d.event.id}`, tab: 'evenements',
-    body: `${eventForm('event-edit', d.event, d.members, d.participants, 'Enregistrer')}<button class="btn danger-t wide" data-a="event-del">Supprimer l’événement</button>`,
+    body: `<div class="stack-lg">${eventForm('event-edit', d.event, d.members, d.participants, 'Enregistrer')}<button class="btn danger-t wide" data-a="event-del">Supprimer l’événement</button></div>`,
   }),
 });
 on('submit', 'event-edit', async (form, f) => {

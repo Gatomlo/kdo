@@ -294,3 +294,7 @@ header.top .icon { display: grid; place-items: center; color: var(--ink); text-d
 button.chiplet:hover, a.chiplet:hover { border-color: var(--plum) }
 .date { width: 44px; padding: 4px 0 }
 .date b { font-size: 1.15rem }
+
+/* Espacements : une carte qui est aussi une pile garde son espacement (.card remettait display:block). */
+.card.stack { display: flex }
+.card.stack-lg { display: flex }
