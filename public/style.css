@@ -303,3 +303,4 @@ button.chiplet:hover, a.chiplet:hover { border-color: var(--plum) }
 .qr { width: min(240px, 70vw); margin: 0 auto; background: #fff; border-radius: 12px; padding: 6px }
 .qr:empty { display: none }
 .qr svg { display: block; width: 100%; height: auto }
+[hidden] { display: none !important }

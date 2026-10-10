@@ -167,3 +167,12 @@ test('liste surprise : invisible pour son destinataire, partout', async () => {
   assert.equal(v.role, 'owner');
   assert.equal(v.canSeeGifts, false);
 });
+
+test('liste surprise à plusieurs : co-organisateurs gestionnaires, jamais la personne fêtée', async () => {
+  const lid = (await f.lea.post('/api/lists', { title: 'Surprise Thomas', surprise: true, ownerId: f.ids.thomas, managers: [f.ids.marc, f.ids.thomas, f.ids.leon] })).data.id;
+  assert.equal((await f.marc.get(`/api/lists/${lid}`)).data.role, 'manager');
+  assert.equal((await f.marc.post(`/api/lists/${lid}/items`, { title: 'Montre' })).status, 201);
+  assert.equal((await f.thomas.get(`/api/lists/${lid}`)).status, 404, 'Thomas ne devient pas co-organisateur de sa surprise');
+  const roles = (await f.lea.get(`/api/lists/${lid}`)).data.roles.map((r) => r.id).sort();
+  assert.deepEqual(roles, [f.ids.lea, f.ids.marc].sort(), 'Léon (sans compte) ignoré');
+});

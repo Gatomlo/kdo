@@ -52,8 +52,10 @@ const newList = (params) => ({
       body: `<form class="stack-lg" data-f="list-new"><div class="card stack">
         <div id="owner-normal">${owners.length > 1 ? `<label>Liste de<select name="ownerId">${owners.map((o) => `<option value="${o.id}">${esc(o.name)}</option>`).join('')}</select></label>` : ''}</div>
         <label class="check"><input type="checkbox" name="surprise" data-ch="surprise-toggle"> 🤫 Liste surprise : invisible pour la personne concernée</label>
-        <div id="owner-surprise" hidden><label>Liste surprise pour<select name="surpriseFor">${d.circle.members.filter((m) => m.id !== d.me.id).map((m) => `<option value="${m.id}">${esc(m.name)}</option>`).join('')}</select></label>
-          <p class="small muted">Elle ne la verra pas du tout ; tu en es gestionnaire et la famille peut réserver dessus.</p></div>
+        <div id="owner-surprise" class="stack" hidden><label>Liste surprise pour<select name="surpriseFor" data-ch="surprise-for">${d.circle.members.filter((m) => m.id !== d.me.id).map((m) => `<option value="${m.id}">${esc(m.name)}</option>`).join('')}</select></label>
+          <p class="small muted">Elle ne la verra pas du tout ; tu en es gestionnaire et la famille peut réserver dessus.</p>
+          ${d.circle.members.some((m) => m.hasAccount && m.id !== d.me.id) ? `<fieldset><legend>La préparer à plusieurs avec <span class="muted">(ils pourront ajouter des articles)</span></legend><div class="people">
+            ${d.circle.members.filter((m) => m.hasAccount && m.id !== d.me.id).map((m) => `<label class="check" data-coorg="${m.id}"><input type="checkbox" name="managers" data-multi value="${m.id}"> ${esc(m.name)}</label>`).join('')}</div></fieldset>` : ''}</div>
         ${listFields({ eventId: params && params.eid ? Number(params.eid) : null }, d.events)}
         <label class="check"><input type="checkbox" name="defaultCategories" checked> Créer les catégories habituelles (Livres, Jeux, Vêtements, Maison, Expériences)</label>
         </div><button class="btn main wide">Créer la liste</button></form>`,
@@ -62,13 +64,24 @@ const newList = (params) => ({
 });
 define('listes/nouvelle', newList());
 define('listes/nouvelle/evenement/:eid', { load: newList().load, view: (d, p) => newList(p).view(d) });
+// La personne fetee ne peut pas co-organiser sa propre surprise.
+const syncCoorg = () => {
+  const sel = document.querySelector('[name=surpriseFor]');
+  document.querySelectorAll('[data-coorg]').forEach((l) => {
+    const hide = l.dataset.coorg === sel.value;
+    l.hidden = hide;
+    if (hide) l.querySelector('input').checked = false;
+  });
+};
 on('change', 'surprise-toggle', (el) => {
   document.getElementById('owner-normal').hidden = el.checked;
   document.getElementById('owner-surprise').hidden = !el.checked;
+  syncCoorg();
 });
+on('change', 'surprise-for', syncCoorg);
 on('submit', 'list-new', async (form, f) => {
   const ownerId = f.surprise ? Number(f.surpriseFor) : f.ownerId ? Number(f.ownerId) : undefined;
-  const r = await attempt(() => post('lists', { ...f, surpriseFor: undefined, ownerId, eventId: f.eventId || null }));
+  const r = await attempt(() => post('lists', { ...f, surpriseFor: undefined, managers: f.surprise ? f.managers : undefined, ownerId, eventId: f.eventId || null }));
   if (r) go(`#/listes/${r.id}`);
 });
 
@@ -439,8 +452,11 @@ define('listes/:id/reglages', {
         <section class="card stack"><h2>Rôles</h2>
           <p class="small muted"><b>Co-propriétaire</b> (liste de couple, de naissance…) : modifie les articles, ne voit jamais les réservations. <b>Gestionnaire</b> : personne de confiance qui modifie les articles et gère les réservations.</p>
           ${d.roles.map((r) => `<div class="between"><span>${esc(r.name)} <span class="pill p-mgr">${label[r.role]}</span></span>${r.id !== S.me.id ? `<button class="linkbtn" data-a="role-del" data-id="${r.id}">retirer</button>` : ''}</div>`).join('')}
-          <form class="row wrap" data-f="role-add"><select name="memberId" class="grow">${d.members.filter((m) => !taken.has(m.id)).map((m) => `<option value="${m.id}">${esc(m.name)}${m.hasAccount ? '' : ' (sans compte)'}</option>`).join('')}</select>
-            <select name="role"><option value="co_owner">co-propriétaire</option><option value="manager">gestionnaire</option></select><button class="btn sm">Ajouter</button></form></section>
+          ${d.list.surprise ? `<p class="small muted">🤫 Liste surprise : ajoute des <b>co-organisateurs</b> (gestionnaires) pour la préparer à plusieurs.</p>
+          <form class="row wrap" data-f="role-add"><select name="memberId" class="grow">${d.members.filter((m) => !taken.has(m.id) && m.hasAccount).map((m) => `<option value="${m.id}">${esc(m.name)}</option>`).join('')}</select>
+            <input type="hidden" name="role" value="manager"><button class="btn sm">Ajouter un co-organisateur</button></form></section>`
+          : `<form class="row wrap" data-f="role-add"><select name="memberId" class="grow">${d.members.filter((m) => !taken.has(m.id)).map((m) => `<option value="${m.id}">${esc(m.name)}${m.hasAccount ? '' : ' (sans compte)'}</option>`).join('')}</select>
+            <select name="role"><option value="co_owner">co-propriétaire</option><option value="manager">gestionnaire</option></select><button class="btn sm">Ajouter</button></form></section>`}
         ${d.role !== 'co_owner' ? `<section class="card stack"><h2>Destinataire</h2>
           <p class="small muted">Liste de <b>${esc(d.owner.name)}</b>. Créée pour quelqu’un avant qu’il ait son compte ? Donne-la-lui : il la verra comme sa liste (sans les réservations).</p>
           <form class="stack tight" data-f="list-transfer"><select name="memberId" aria-label="Nouveau destinataire">${d.members.filter((m) => m.id !== d.owner.id).map((m) => `<option value="${m.id}">${esc(m.name)}${m.hasAccount ? '' : ' (sans compte)'}</option>`).join('')}</select>

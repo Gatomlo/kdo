@@ -23,6 +23,6 @@ test('adresses internes refusées', () => {
 test('aperçu : produit JSON-LD (image, prix, vendeur) et image principale Amazon', () => {
   const ld = '<title>x</title><script type="application/ld+json">{"@graph":[{"@type":"Product","name":"Vélo","image":["/v.jpg"],"offers":{"price":"129.9","seller":{"name":"Vélos & Co"}}}]}</script>';
   assert.deepEqual(parse(ld, new URL('https://www.velo.be/p')), { title: 'Vélo', image: 'https://www.velo.be/v.jpg', price: '129,90', shop: 'Vélos & Co' });
-  const amz = '<title>Livre</title><img id="landingImage" data-old-hires="https://m.media-amazon.com/images/I/1.jpg">"priceAmount":7.5,';
-  assert.deepEqual(parse(amz, new URL('https://www.amazon.fr/dp/1')), { title: 'Livre', image: 'https://m.media-amazon.com/images/I/1.jpg', price: '7,50', shop: 'amazon.fr' });
+  const amz = '<title>Livre : Saint-Ex: Amazon.fr: Livres</title><img id="landingImage" data-old-hires="https://m.media-amazon.com/images/I/1.jpg">"priceAmount":7.5,';
+  assert.deepEqual(parse(amz, new URL('https://www.amazon.fr/dp/1')), { title: 'Livre : Saint-Ex', image: 'https://m.media-amazon.com/images/I/1.jpg', price: '7,50', shop: 'amazon.fr' });
 });
