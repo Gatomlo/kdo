@@ -1,6 +1,6 @@
 // Secours : definit le mot de passe d'un compte depuis le serveur (sans e-mail ni lien).
 // Usage : npm run set-password -- <email> <mot de passe>
-// (HOTTE_DATA_DIR pour une autre base que data/.)
+// (KDO_DATA_DIR pour une autre base que data/.)
 const { db } = require('../lib/db');
 const { hashPassword } = require('../lib/auth');
 

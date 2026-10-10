@@ -1,4 +1,4 @@
-# La Hotte — Cahier des charges (v0.6)
+# Kdo — Cahier des charges (v0.6)
 
 Outil **privé et familial** de listes de souhaits, d'événements et de Secret Santa.
 Pas de vocation grand public, pas de modèle économique. Interface en français.
@@ -92,7 +92,7 @@ Permettre aux membres d'une famille de :
 - **Dupliquer** une liste.
 
 ### 4.9 Compléments (v0.6)
-- **Partager une page vers La Hotte** depuis le téléphone (app installée, Android) : choix de la liste, article pré-rempli.
+- **Partager une page vers Kdo** depuis le téléphone (app installée, Android) : choix de la liste, article pré-rempli.
 - **Fiche tailles et préférences** par personne (tailles, pointure, bague, couleurs, aime / n'aime pas, a déjà), visible de la famille et des invités de ses listes.
 - **Recherche** dans les listes, articles, idées secrètes et fiches.
 - **Secret Santa** : 3 idées laissées à son Secret Santa ; duos dévoilés par l'organisateur après la fête.
@@ -106,9 +106,9 @@ Permettre aux membres d'une famille de :
 | Application | **Express 4** (Node ≥ 22.5), `server.js` exporte l'app : front + API dans un seul service |
 | Interface | SPA en **modules ES sans framework ni build**, navigation par `#/…`, CSP stricte |
 | Base de données | **SQLite via `node:sqlite`** (aucun module natif), migrations par `PRAGMA user_version` |
-| Auth | E-mail + mot de passe (scrypt), invitations et réinitialisations par lien, session 90 j (cookie httpOnly limité à `/hotte/`) |
+| Auth | E-mail + mot de passe (scrypt), invitations et réinitialisations par lien, session 90 j (cookie httpOnly limité à `/kdo/`) |
 | E-mails | nodemailer, **facultatifs** (SMTP ou sendmail) : notifications ignorées si non configurés |
-| Déploiement | Monté dans **node-gateway** sur `/hotte` (Infomaniak : une seule app Node par hébergement) |
+| Déploiement | Monté dans **node-gateway** sur `/kdo` (Infomaniak : une seule app Node par hébergement) |
 | Sauvegarde | `node scripts/backup.js` (copie quotidienne de la base) |
 
 ### Modèle de données (simplifié)
@@ -139,5 +139,5 @@ Règle clé : toute requête de lecture de `Reservation`, `Comment`, `OffListGif
 
 ## 7. Points ouverts
 
-- Nom définitif de l'application (adresse : `/hotte` sur le domaine de la passerelle, pas de sous-domaine).
+- Nom définitif de l'application (adresse : `/kdo` sur le domaine de la passerelle, pas de sous-domaine).
 - E-mails : aucun envoi en prod aujourd'hui ; un SMTP (saisi par l'administrateur dans l'app) active le lien de connexion et les notifications (§4.5).

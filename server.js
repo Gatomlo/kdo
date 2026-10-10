@@ -1,5 +1,5 @@
-// La Hotte : serveur Express. Seul (npm start, PORT) ou monte dans node-gateway sur
-// /hotte (dossier apps/hotte) : le module exporte l'app, et n'ecoute un port ou
+// Kdo : serveur Express. Seul (npm start, PORT) ou monte dans node-gateway sur
+// /kdo (dossier apps/kdo) : le module exporte l'app, et n'ecoute un port ou
 // n'installe de gestionnaire global que s'il est lance directement.
 const fs = require('fs');
 const path = require('path');
@@ -38,7 +38,7 @@ app.use('/api', (err, req, res, next) => { // eslint-disable-line no-unused-vars
 });
 
 // Page unique (navigation par #). <base> = racine de l'app, pour des chemins relatifs
-// valables seuls comme sous /hotte.
+// valables seuls comme sous /kdo.
 app.get('/', (req, res) => {
   security.pagePolicy(res);
   const root = auth.rootPath(req).replace(/[<>"&]/g, '');
@@ -47,7 +47,7 @@ app.get('/', (req, res) => {
 
 if (require.main === module) {
   const PORT = process.env.PORT || 3000;
-  app.listen(PORT, () => console.log(`La Hotte : http://localhost:${PORT}/`));
+  app.listen(PORT, () => console.log(`Kdo : http://localhost:${PORT}/`));
 }
 
 module.exports = app;

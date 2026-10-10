@@ -28,8 +28,8 @@ const ICONS = {
 function applyDisplay() {
   const root = document.documentElement;
   try {
-    root.classList.toggle('big', localStorage.getItem('hotte-big') === '1');
-    root.classList.toggle('simple', localStorage.getItem('hotte-simple') === '1');
+    root.classList.toggle('big', localStorage.getItem('kdo-big') === '1');
+    root.classList.toggle('simple', localStorage.getItem('kdo-simple') === '1');
   } catch { /* stockage indisponible */ }
 }
 applyDisplay();
@@ -37,7 +37,7 @@ export function toggleDisplay(key) {
   try { localStorage.setItem(key, localStorage.getItem(key) === '1' ? '0' : '1'); } catch { /* idem */ }
   applyDisplay();
 }
-on('click', 'big-text', () => toggleDisplay('hotte-big'));
+on('click', 'big-text', () => toggleDisplay('kdo-big'));
 on('change', 'display', (el) => toggleDisplay(el.dataset.k));
 
 const NAV = [
@@ -61,10 +61,10 @@ function shell(v) {
     : `<button class="fab" data-a="${esc(v.fab.action)}">${ICONS.plus}<span>${esc(v.fab.label)}</span></button>`) : '';
   app.className = 'shell' + (v.noNav || (S.me && S.me.guest) ? ' nonav' : '');
   const header = v.noNav && !v.title ? '' : `<header class="top">${v.back ? `<a class="back" href="${esc(v.back)}" aria-label="Retour">‹</a>` : ''}
-      ${v.title ? `<h2>${esc(v.title)}${v.sub ? `<small>${esc(v.sub)}</small>` : ''}</h2>` : '<a class="brand" href="#/">La <i>Hotte</i></a>'}
+      ${v.title ? `<h2>${esc(v.title)}${v.sub ? `<small>${esc(v.sub)}</small>` : ''}</h2>` : '<a class="brand" href="#/">K<i>do</i></a>'}
       ${v.right || ''}${gear}${me}</header>`;
   app.innerHTML = `${header}<main id="view" tabindex="-1">${v.body}</main>${fab}${nav}`;
-  document.title = v.title ? `${v.title} · La Hotte` : 'La Hotte';
+  document.title = v.title ? `${v.title} · Kdo` : 'Kdo';
 }
 
 let current = null; // { route, params }
@@ -111,9 +111,9 @@ on('click', 'theme', () => {
   const root = document.documentElement;
   const dark = root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
   root.dataset.theme = dark ? 'light' : 'dark';
-  try { localStorage.setItem('hotte-theme', root.dataset.theme); } catch { /* stockage indisponible */ }
+  try { localStorage.setItem('kdo-theme', root.dataset.theme); } catch { /* stockage indisponible */ }
 });
-try { const th = localStorage.getItem('hotte-theme'); if (th) document.documentElement.dataset.theme = th; } catch { /* idem */ }
+try { const th = localStorage.getItem('kdo-theme'); if (th) document.documentElement.dataset.theme = th; } catch { /* idem */ }
 
 // Application installable (voir sw.js).
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});

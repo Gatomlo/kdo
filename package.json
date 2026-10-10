@@ -1,8 +1,8 @@
 {
-  "name": "la-hotte",
+  "name": "kdo",
   "version": "0.1.0",
   "private": true,
-  "description": "La Hotte : listes de cadeaux de la famille, réservations cachées, événements et Secret Santa. Node.js + SQLite, montable dans node-gateway.",
+  "description": "Kdo : listes de cadeaux de la famille, réservations cachées, événements et Secret Santa. Node.js + SQLite, montable dans node-gateway.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

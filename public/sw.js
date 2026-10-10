@@ -1,10 +1,10 @@
 // Service worker : l'application s'installe et s'ouvre vite. Portee = dossier de l'app
-// (/hotte/ dans la passerelle). L'API n'est jamais mise en cache (donnees toujours
+// (/kdo/ dans la passerelle). L'API n'est jamais mise en cache (donnees toujours
 // fraiches : une reservation doit etre vue tout de suite par les autres offrants).
 // Changer VERSION quand la liste des fichiers change.
-const VERSION = 'hotte-v6';
+const VERSION = 'kdo-v7';
 const FILES = [
-  './', 'style.css', 'manifest.json', 'icon.svg',
+  './', 'style.css', 'manifest.json', 'icon.svg', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'apple-touch-icon.png', 'favicon-32.png',
   'app/main.js', 'app/ui.js', 'app/api.js', 'app/state.js', 'app/router.js', 'app/cards.js', 'app/connexion.js',
   'app/install.js', 'app/accueil.js', 'app/listes.js', 'app/evenements.js', 'app/cercle.js', 'app/idees.js', 'app/cadeaux.js', 'app/recherche.js', 'app/journal.js',
 ];
@@ -21,8 +21,8 @@ self.addEventListener('activate', (e) => {
 // Notifications (Web Push) : { title, body, url } ; au toucher, l'app s'ouvre a la bonne page.
 self.addEventListener('push', (e) => {
   let d = {};
-  try { d = e.data.json(); } catch { d = { title: 'La Hotte', body: e.data ? e.data.text() : '' }; }
-  e.waitUntil(self.registration.showNotification(d.title || 'La Hotte', { body: d.body || '', icon: 'icon.svg', badge: 'icon.svg', data: { url: d.url || '#/' } }));
+  try { d = e.data.json(); } catch { d = { title: 'Kdo', body: e.data ? e.data.text() : '' }; }
+  e.waitUntil(self.registration.showNotification(d.title || 'Kdo', { body: d.body || '', icon: 'icon-192.png', badge: 'favicon-32.png', data: { url: d.url || '#/' } }));
 });
 self.addEventListener('notificationclick', (e) => {
   e.notification.close();

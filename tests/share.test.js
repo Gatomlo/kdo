@@ -114,7 +114,7 @@ test('photo : dépôt, type vérifié, lien sur l’article, servie', async () =
   assert.equal(served.status, 200);
   assert.equal(Buffer.from(await served.arrayBuffer()).length, JPEG.length);
   // Chemin local détourné : refusé.
-  await f.lea.patch(`/api/items/${itemId}`, { title: 'Vélo rouge', image: 'photos/../hotte.db' });
+  await f.lea.patch(`/api/items/${itemId}`, { title: 'Vélo rouge', image: 'photos/../kdo.db' });
   assert.equal((await f.lea.get(`/api/lists/${listId}`)).data.items[0].image, null);
 });
 
@@ -129,18 +129,18 @@ test('photos orphelines supprimées après 24 h', async () => {
 
 test('réglages e-mail : admin seulement, mot de passe jamais renvoyé', async () => {
   assert.equal((await f.lea.get('/api/settings')).status, 403);
-  const r = await f.thomas.put('/api/settings', { smtp: { host: 'mail.exemple.be', port: 465, secure: true, user: 'hotte@exemple.be', pass: 'secret', from: 'hotte@exemple.be' }, publicUrl: 'https://exemple.be/hotte/' });
+  const r = await f.thomas.put('/api/settings', { smtp: { host: 'mail.exemple.be', port: 465, secure: true, user: 'kdo@exemple.be', pass: 'secret', from: 'kdo@exemple.be' }, publicUrl: 'https://exemple.be/kdo/' });
   assert.equal(r.status, 200);
   assert.equal(r.data.host, 'mail.exemple.be');
   assert.equal(r.data.hasPass, true);
   assert.ok(!JSON.stringify(r.data).includes('secret'));
-  assert.equal(r.data.publicUrl, 'https://exemple.be/hotte');
+  assert.equal(r.data.publicUrl, 'https://exemple.be/kdo');
   // Mot de passe vide = garde l'ancien.
-  await f.thomas.put('/api/settings', { smtp: { host: 'mail.exemple.be', port: 465, secure: true, user: 'hotte@exemple.be', pass: '' } });
+  await f.thomas.put('/api/settings', { smtp: { host: 'mail.exemple.be', port: 465, secure: true, user: 'kdo@exemple.be', pass: '' } });
   assert.equal(require('../lib/db').getSetting('smtp').pass, 'secret');
   // Les liens utilisent l'adresse publique.
   const inv = await f.thomas.post('/api/circle/invitations', {});
-  assert.match(inv.data.url, /^https:\/\/exemple\.be\/hotte\/\?invite=/);
+  assert.match(inv.data.url, /^https:\/\/exemple\.be\/kdo\/\?invite=/);
   assert.equal((await f.thomas.put('/api/settings', { publicUrl: 'javascript:alert(1)' })).status, 400);
   await f.thomas.put('/api/settings', { smtp: { host: '' }, publicUrl: '' });
 });

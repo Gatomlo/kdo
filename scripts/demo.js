@@ -5,9 +5,9 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-process.env.HOTTE_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'hotte-demo-'));
-process.env.HOTTE_MAIL = process.env.HOTTE_MAIL || 'log';
-process.env.HOTTE_QUIET = '1';
+process.env.KDO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'kdo-demo-'));
+process.env.KDO_MAIL = process.env.KDO_MAIL || 'log';
+process.env.KDO_QUIET = '1';
 const app = require('../server');
 
 const PORT = Number(process.env.PORT) || 3100;
@@ -82,7 +82,7 @@ async function seed() {
 const server = app.listen(PORT, async () => {
   try {
     await seed();
-    console.log(`\nLa Hotte (démo) : ${base}/\nComptes : thomas@demo.be (admin), lea@demo.be, marc@demo.be, mamy@demo.be — mot de passe : ${PASSWORD}\nDonnées : ${process.env.HOTTE_DATA_DIR}\n`);
+    console.log(`\nKdo (démo) : ${base}/\nComptes : thomas@demo.be (admin), lea@demo.be, marc@demo.be, mamy@demo.be — mot de passe : ${PASSWORD}\nDonnées : ${process.env.KDO_DATA_DIR}\n`);
   } catch (e) {
     console.error('Démo :', e.message);
     server.close();

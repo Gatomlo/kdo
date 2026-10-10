@@ -1,4 +1,4 @@
-/* La Hotte — styles. Mobile d'abord ; colonne centree sur grand ecran. Palette de la maquette. */
+/* Kdo — styles. Mobile d'abord ; colonne centree sur grand ecran. Palette de la maquette. */
 :root {
   --bg: #f4f3fa; --surface: #fff; --sunk: #eceaf5; --ink: #1d1b33; --muted: #6a6780; --line: #e2e0ec;
   --ribbon: #d9405a; --ribbon-soft: #fbe3e7; --gold: #a8660f; --gold-soft: #fbefd9;
@@ -298,3 +298,4 @@ button.chiplet:hover, a.chiplet:hover { border-color: var(--plum) }
 /* Espacements : une carte qui est aussi une pile garde son espacement (.card remettait display:block). */
 .card.stack { display: flex }
 .card.stack-lg { display: flex }
+.hero .logo-img { border-radius: 20px; box-shadow: 0 12px 28px -12px rgba(217, 64, 90, .6) }

@@ -149,17 +149,17 @@ define('reglages', {
         <label>Serveur SMTP<input name="host" value="${esc(s.host)}" placeholder="mail.infomaniak.com"></label>
         <div class="grid2"><label>Port<input name="port" type="number" min="1" max="65535" value="${esc(s.port)}"></label>
           <label class="check" style="align-self:end"><input type="checkbox" name="secure" ${s.secure ? 'checked' : ''}> SSL/TLS direct (port 465)</label></div>
-        <label>Identifiant (adresse de la boîte)<input name="user" value="${esc(s.user)}" autocomplete="off" placeholder="hotte@ton-domaine.be"></label>
+        <label>Identifiant (adresse de la boîte)<input name="user" value="${esc(s.user)}" autocomplete="off" placeholder="kdo@ton-domaine.be"></label>
         <label>Mot de passe de la boîte<input name="pass" type="password" autocomplete="new-password" placeholder="${s.hasPass ? '•••••••• (inchangé si vide)' : ''}"></label>
         <label>Adresse d’expédition <span class="muted">(par défaut : l’identifiant)</span><input name="from" type="email" value="${esc(s.from)}"></label>
         <details><summary>Exemples de réglages</summary><div class="small stack tight">
           <p><b>Infomaniak</b> : serveur <code>mail.infomaniak.com</code>, port 465 + SSL coché (ou 587 sans), identifiant = adresse complète de la boîte, son mot de passe.</p>
           <p><b>Gmail</b> : <code>smtp.gmail.com</code>, port 465 + SSL, mot de passe d’application (compte Google avec validation en deux étapes).</p>
-          <p>Conseil : crée une boîte dédiée (ex. <code>hotte@…</code>) plutôt que ta boîte personnelle.</p></div></details>
+          <p>Conseil : crée une boîte dédiée (ex. <code>kdo@…</code>) plutôt que ta boîte personnelle.</p></div></details>
         <div class="row wrap"><button class="btn main">Enregistrer</button><button type="button" class="btn ghost" data-a="test-mail" ${s.mode === 'off' ? 'disabled' : ''}>Envoyer un e-mail d’essai</button>
           ${s.host ? '<button type="button" class="btn danger-t" data-a="mail-off">Désactiver l’envoi</button>' : ''}</div></form>
       <form class="card stack" data-f="settings-url"><h2>Adresse publique</h2>
-        <p class="small muted">Adresse utilisée dans les liens d’invitation, de partage et les e-mails. À renseigner une fois en ligne (ex. <code>https://ton-domaine.be/hotte</code>).${s.publicUrlEnv ? ' Actuellement imposée par le serveur.' : ''}</p>
+        <p class="small muted">Adresse utilisée dans les liens d’invitation, de partage et les e-mails. À renseigner une fois en ligne (ex. <code>https://ton-domaine.be/kdo</code>).${s.publicUrlEnv ? ' Actuellement imposée par le serveur.' : ''}</p>
         <label>Adresse<input name="publicUrl" type="url" value="${esc(s.publicUrl)}" placeholder="${esc(s.detectedUrl)}" ${s.publicUrlEnv ? 'disabled' : ''}></label>
         <p class="small muted">Adresse utilisée actuellement : <code>${esc(s.detectedUrl)}</code></p>
         <button class="btn" ${s.publicUrlEnv ? 'disabled' : ''}>Enregistrer</button></form>
@@ -207,8 +207,8 @@ define('moi', {
       <a class="card lc" href="#/fiche/${d.self.id}"><span class="cover">📏</span><span class="grow"><b>Ma fiche tailles et préférences</b><span class="meta">Tailles, pointure, couleurs, ce que j’aime ou pas</span></span>→</a>
       ${pushSection(d.push)}
       <section class="card stack"><h2>Affichage sur cet appareil</h2>
-        <label class="check"><input type="checkbox" data-ch="display" data-k="hotte-big" ${document.documentElement.classList.contains('big') ? 'checked' : ''}> Texte plus grand</label>
-        <label class="check"><input type="checkbox" data-ch="display" data-k="hotte-simple" ${document.documentElement.classList.contains('simple') ? 'checked' : ''}> Vue simplifiée (gros boutons, sans discussions ni filtres)</label>
+        <label class="check"><input type="checkbox" data-ch="display" data-k="kdo-big" ${document.documentElement.classList.contains('big') ? 'checked' : ''}> Texte plus grand</label>
+        <label class="check"><input type="checkbox" data-ch="display" data-k="kdo-simple" ${document.documentElement.classList.contains('simple') ? 'checked' : ''}> Vue simplifiée (gros boutons, sans discussions ni filtres)</label>
         <button class="btn ghost" data-a="theme">◐ Mode clair / sombre</button></section>
       ${d.me.profiles.length ? `<section class="card stack"><h2>Profils que je gère</h2>${d.me.profiles.map((p) => `<div class="row">${avatar(p, 'sm')}<span class="grow">${esc(p.name)}</span><a class="link" href="#/listes/nouvelle">+ liste</a></div>`).join('')}</section>` : ''}
       <section class="stack"><a class="btn ghost" href="#/mes-cadeaux">🎁 Mes cadeaux : budget et historique</a>

@@ -1,5 +1,5 @@
 // Appels a l'API (adresses relatives : la balise <base> pointe sur la racine de l'app,
-// /hotte/ dans la passerelle).
+// /kdo/ dans la passerelle).
 import { toast } from './ui.js';
 import { S } from './state.js';
 

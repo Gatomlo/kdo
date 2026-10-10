@@ -89,10 +89,10 @@ export function loginView() {
       <p class="muted small">Mot de passe oublié : demande un lien de réinitialisation à l’administrateur du cercle.</p>`;
   }
   const invCard = inv && mode === 'register'
-    ? `<p class="banner info">🎁 <span><b>${esc(inv.inviter || 'Quelqu’un')}</b> t’invite à rejoindre le cercle familial sur La Hotte${inv.profileName ? ` : ton profil « ${esc(inv.profileName)} » et ses listes deviennent les tiens` : ''}.</span></p>` : '';
+    ? `<p class="banner info">🎁 <span><b>${esc(inv.inviter || 'Quelqu’un')}</b> t’invite à rejoindre le cercle familial sur Kdo${inv.profileName ? ` : ton profil « ${esc(inv.profileName)} » et ses listes deviennent les tiens` : ''}.</span></p>` : '';
   return {
     noNav: true, title: '',
-    body: `<div class="hero"><div class="logo">🎁</div><h1>La <i>Hotte</i></h1><p class="muted">Les listes de cadeaux de la famille, sans spoiler.</p></div>
+    body: `<div class="hero"><img class="logo-img" src="icon.svg" alt="" width="84" height="84"><h1>K<i>do</i></h1><p class="muted">Les listes de cadeaux de la famille, sans spoiler.</p></div>
       ${invCard}<form class="card stack narrow" data-f="auth" data-m="${mode}">${form}</form>`,
   };
 }
