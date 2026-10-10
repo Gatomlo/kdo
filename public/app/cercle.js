@@ -112,12 +112,14 @@ on('click', 'profile-account', async (el) => {
 // ---------- Anniversaire (soi, profils geres, ou admin) ----------
 // Delai reglable par personne : combien de jours avant l'anniversaire la liste et
 // l'evenement sont crees automatiquement.
+const MONTHS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
 function birthdaySheet(m) {
   const known = m.birthDate && !m.birthDate.startsWith('0000');
   const who = m.me ? 'tu es prévenu·e' : m.hasAccount ? `${esc(m.name)} est prévenu·e` : 'ses gestionnaires sont prévenus';
   sheet(`<h3>🎂 Anniversaire ${m.me ? '' : `de ${esc(m.name)}`}</h3><form class="stack" data-f="birthday" data-id="${m.id}">
-    <div class="grid2"><label>Jour et mois<input name="md" type="text" inputmode="numeric" placeholder="JJ/MM" required value="${m.birthDate ? `${m.birthDate.slice(8)}/${m.birthDate.slice(5, 7)}` : ''}"></label>
-      <label>Année <span class="muted">(facultatif, pour l’âge)</span><input name="year" type="number" min="1900" max="2100" value="${known ? m.birthDate.slice(0, 4) : ''}"></label></div>
+    <div class="grid2"><label>Jour<select name="day" required><option value="">—</option>${Array.from({ length: 31 }, (_, k) => `<option value="${k + 1}" ${m.birthDate && Number(m.birthDate.slice(8)) === k + 1 ? 'selected' : ''}>${k + 1}</option>`).join('')}</select></label>
+      <label>Mois<select name="month" required><option value="">—</option>${MONTHS.map((n, k) => `<option value="${k + 1}" ${m.birthDate && Number(m.birthDate.slice(5, 7)) === k + 1 ? 'selected' : ''}>${n}</option>`).join('')}</select></label></div>
+    <label>Année <span class="muted">(facultatif, pour l’âge)</span><input name="year" type="number" inputmode="numeric" min="1900" max="2100" value="${known ? m.birthDate.slice(0, 4) : ''}"></label>
     <label class="check"><input type="checkbox" name="auto" data-ch="bd-auto" ${m.birthdayLeadDays ? 'checked' : ''}> Créer automatiquement la liste et l’événement</label>
     <label id="bd-lead" ${m.birthdayLeadDays ? '' : 'hidden'}>Combien de jours avant l’anniversaire ?<input name="lead" type="number" min="1" max="180" value="${m.birthdayLeadDays || 30}"></label>
     <p class="small muted">La liste « Anniversaire de ${esc(m.name)} » et l’événement (toute la famille invitée) sont créés ce nombre de jours avant ; ${who} pour la remplir.</p>
@@ -129,9 +131,8 @@ const saveBirthday = async (id, body) => {
   if (await attempt(() => put(`circle/members/${id}/birthday`, body))) { closeSheet(); toast('Anniversaire enregistré'); reload(); }
 };
 on('submit', 'birthday', (form, f) => {
-  const m = String(f.md).trim().match(/^(\d{1,2})[/.-](\d{1,2})$/);
-  if (!m) { toast('Indique le jour et le mois (JJ/MM).', true); return; }
-  const md = `${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+  if (!f.day || !f.month) { toast('Choisis le jour et le mois.', true); return; }
+  const md = `${String(f.month).padStart(2, '0')}-${String(f.day).padStart(2, '0')}`;
   saveBirthday(form.dataset.id, { birthDate: f.year ? `${f.year}-${md}` : md, leadDays: f.auto ? Number(f.lead) : null });
 });
 on('click', 'birthday-clear', () => saveBirthday(document.querySelector('form[data-f=birthday]').dataset.id, { birthDate: '', leadDays: null }));

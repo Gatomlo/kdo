@@ -4,7 +4,7 @@ import { toast } from './ui.js';
 import { S } from './state.js';
 
 export class ApiError extends Error {
-  constructor(status, message) { super(message); this.status = status; }
+  constructor(status, message, code) { super(message); this.status = status; this.code = code; }
 }
 
 export async function api(method, url, body) {
@@ -20,7 +20,7 @@ export async function api(method, url, body) {
     throw new ApiError(0, 'Pas de réseau.');
   }
   const data = await res.json().catch(() => null);
-  if (!res.ok) throw new ApiError(res.status, (data && data.error) || 'Erreur.');
+  if (!res.ok) throw new ApiError(res.status, (data && data.error) || 'Erreur.', data && data.code);
   return data;
 }
 

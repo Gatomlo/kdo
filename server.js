@@ -34,7 +34,7 @@ app.use('/api', (req, res) => res.status(404).json({ error: 'Adresse inconnue.' 
 app.use('/api', (err, req, res, next) => { // eslint-disable-line no-unused-vars
   const status = err.status || err.statusCode || 500;
   if (status >= 500) console.error(err);
-  res.status(status).json({ error: status >= 500 ? 'Erreur interne du serveur.' : err.message });
+  res.status(status).json({ error: status >= 500 ? 'Erreur interne du serveur.' : err.message, code: status >= 500 ? undefined : err.code });
 });
 
 // Page unique (navigation par #). <base> = racine de l'app, pour des chemins relatifs

@@ -91,3 +91,31 @@ test('journal : admin seulement, arrivées, invitations en attente annulables', 
   assert.equal((await f.thomas.del(`/api/admin/invitations/${inv.id}`)).status, 200);
   assert.ok(!(await f.thomas.get('/api/admin/journal')).data.invitations.some((i) => i.email === 'zoe@exemple.be'));
 });
+
+test('Secret Santa : deux parents et un enfant géré, tirage possible seulement si autorisé', async () => {
+  await f.thomas.post(`/api/circle/profiles/${f.ids.leon}/managers`, { managerId: f.ids.lea });
+  const ev = (await f.thomas.post('/api/events', { title: 'Petit Noël', date: '2099-12-25', participants: [f.ids.thomas, f.ids.lea, f.ids.leon] })).data.id;
+  await f.thomas.post(`/api/events/${ev}/santa`);
+  await f.thomas.patch(`/api/events/${ev}/santa`, { avoidPrevious: false });
+  const r = await f.thomas.post(`/api/events/${ev}/santa/draw`);
+  assert.equal(r.status, 409);
+  assert.equal(r.data.code, 'managers');
+  assert.match(r.data.error, /Léon/);
+  assert.equal((await f.thomas.post(`/api/events/${ev}/santa/draw`, { allowManagers: true })).status, 200);
+  await f.thomas.del(`/api/circle/profiles/${f.ids.leon}/managers/${f.ids.lea}`);
+});
+
+test('transfert de liste : vers le compte de l’enfant, le parent reste gestionnaire', async () => {
+  const lid = (await f.thomas.post('/api/lists', { title: 'Pour Marc' })).data.id;
+  const item = (await f.thomas.post(`/api/lists/${lid}/items`, { title: 'Vélo' })).data.id;
+  assert.equal((await f.lea.post(`/api/items/${item}/reserve`, {})).status < 300, true);
+  assert.equal((await f.lea.post(`/api/lists/${lid}/transfer`, { memberId: f.ids.marc })).status, 403, 'simple offrant');
+  assert.equal((await f.thomas.post(`/api/lists/${lid}/transfer`, { memberId: f.ids.lea })).status, 409, 'Léa a réservé dessus');
+  assert.equal((await f.thomas.post(`/api/lists/${lid}/transfer`, { memberId: f.ids.marc, keepManager: true })).status, 200);
+  const v = (await f.marc.get(`/api/lists/${lid}`)).data;
+  assert.equal(v.role, 'owner');
+  assert.equal(v.canSeeGifts, false);
+  const t = (await f.thomas.get(`/api/lists/${lid}`)).data;
+  assert.equal(t.role, 'manager');
+  assert.equal(t.canSeeGifts, true);
+});

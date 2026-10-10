@@ -136,7 +136,12 @@ on('click', 'excl-del', async (el) => { if (await attempt(() => del(`events/${ev
 on('click', 'santa-draw', async () => {
   const opened = S.data.opened.some((o) => o.opened);
   if (opened && !(await confirmSheet({ title: 'Refaire le tirage ?', text: 'Des enveloppes ont déjà été ouvertes. Toutes les attributions changeront et tous les participants seront prévenus.', ok: 'Refaire le tirage', danger: true }))) return;
-  const r = await attempt(() => post(`events/${evId()}/santa/draw`, { force: opened }));
+  const body = { force: opened };
+  let r = await post(`events/${evId()}/santa/draw`, body).catch((e) => e);
+  if (r instanceof Error) {
+    if (r.code !== 'managers') r = await attempt(() => Promise.reject(r));
+    else r = (await confirmSheet({ title: 'Autoriser ce tirage ?', text: esc(r.message), ok: 'Tirer quand même' })) && await attempt(() => post(`events/${evId()}/santa/draw`, { ...body, allowManagers: true }));
+  }
   if (r) { toast(r.redraw ? 'Nouveau tirage effectué' : 'Tirage effectué : les enveloppes sont prêtes !'); reload(); }
 });
 on('click', 'santa-reveal', async () => {

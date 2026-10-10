@@ -433,6 +433,11 @@ define('listes/:id/reglages', {
           ${d.roles.map((r) => `<div class="between"><span>${esc(r.name)} <span class="pill p-mgr">${label[r.role]}</span></span>${r.id !== S.me.id ? `<button class="linkbtn" data-a="role-del" data-id="${r.id}">retirer</button>` : ''}</div>`).join('')}
           <form class="row wrap" data-f="role-add"><select name="memberId" class="grow">${d.members.filter((m) => !taken.has(m.id)).map((m) => `<option value="${m.id}">${esc(m.name)}${m.hasAccount ? '' : ' (sans compte)'}</option>`).join('')}</select>
             <select name="role"><option value="co_owner">co-propriétaire</option><option value="manager">gestionnaire</option></select><button class="btn sm">Ajouter</button></form></section>
+        ${d.role !== 'co_owner' ? `<section class="card stack"><h2>Destinataire</h2>
+          <p class="small muted">Liste de <b>${esc(d.owner.name)}</b>. Créée pour quelqu’un avant qu’il ait son compte ? Donne-la-lui : il la verra comme sa liste (sans les réservations).</p>
+          <form class="stack tight" data-f="list-transfer"><select name="memberId" aria-label="Nouveau destinataire">${d.members.filter((m) => m.id !== d.owner.id).map((m) => `<option value="${m.id}">${esc(m.name)}${m.hasAccount ? '' : ' (sans compte)'}</option>`).join('')}</select>
+            <label class="check"><input type="checkbox" name="keepManager" checked> Je reste gestionnaire (je modifie et vois les réservations)</label>
+            <button class="btn">Changer de destinataire</button></form></section>` : ''}
         ${shareSection(d)}
         <section class="card stack"><h2>Après la fête</h2>
           <p class="small muted">Marque les cadeaux reçus (bouton « Reçu ✓ » sur chaque article), puis reporte les autres dans une liste suivante : cette liste sera archivée, l’historique des cadeaux est gardé.</p>
@@ -512,6 +517,11 @@ on('click', 'cat-del', async (el) => {
 on('submit', 'role-add', async (form, f) => {
   if (!f.memberId) return;
   if (await attempt(() => post(`lists/${listId()}/roles`, { memberId: Number(f.memberId), role: f.role }))) { toast('Rôle ajouté'); reload(); }
+});
+on('submit', 'list-transfer', async (form, f) => {
+  const m = S.data.members.find((x) => x.id === Number(f.memberId));
+  if (!m || !(await confirmSheet({ title: `Donner la liste à ${esc(m.name)} ?`, text: `${esc(m.name)} en deviendra le destinataire : les réservations lui seront cachées.`, ok: 'Transférer' }))) return;
+  if (await attempt(() => post(`lists/${listId()}/transfer`, { memberId: m.id, keepManager: !!f.keepManager }))) { toast('Liste transférée'); go(`#/listes/${listId()}`); }
 });
 on('click', 'role-del', async (el) => { if (await attempt(() => del(`lists/${listId()}/roles/${el.dataset.id}`))) reload(); });
 on('click', 'list-archive', async () => {
