@@ -41,6 +41,9 @@ Même socle que Le Cabas (`../listes-courses`, s'en inspirer) et MyLittleLibrary
 - Icônes d'installation (PNG iPhone/Android, maskable, favicon) : `python scripts/make-icons.py` (Pillow) les régénère ; même dessin que `public/icon.svg` (paquet crème, ruban violet, fond framboise).
 - `npm run set-password -- <email> <mdp>` (secours) · `node scripts/backup.js` (copie datée de la base dans `data/backups/`, 30 gardées).
 
+## Dépôt
+GitHub : https://github.com/Gatomlo/kdo (branche `main`) ; pousser après chaque commit.
+
 ## Déploiement (Infomaniak, via node-gateway)
 Dossier `apps/kdo` de la passerelle → servi sur `/kdo` (local : jonction `node-gateway/apps/kdo` → ce dossier). Envoyer `server.js`, `package.json`, `package-lock.json`, `lib/`, `public/`, `scripts/` (jamais `data/`), `npm install --omit=dev`, redémarrer. Après la mise en ligne : Cercle → Réglages de l'app → adresse publique (`https://<domaine>/kdo`) et, si voulu, SMTP (bouton d'e-mail d'essai). Les photos sont dans `data/photos/` (à sauvegarder avec la base). Migrations automatiques au démarrage. Sauvegarde : tâche planifiée `node scripts/backup.js`.
 
