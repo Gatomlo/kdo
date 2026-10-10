@@ -14,8 +14,13 @@ function extras(m, ideas) {
   return `<span class="meta">${birthday}<a class="chiplet" href="#/fiche/${m.id}" title="Tailles et préférences">📏</a>${idea}</span>`;
 }
 
-const linkSheet = (title, url, text) => sheet(`<h3>${esc(title)}</h3><p class="muted small">${text}</p>
+// Lien a transmettre, avec son QR code (a scanner avec l'appareil photo du telephone).
+const linkSheet = (title, url, text) => {
+  sheet(`<h3>${esc(title)}</h3><p class="muted small">${text}</p>
+  <div class="qr" id="qr" aria-label="QR code du lien"></div>
   <input readonly value="${esc(url)}" class="select-all"><div class="row end"><button class="btn ghost" data-a="close-sheet">Fermer</button><button class="btn main" data-a="copy" data-text="${esc(url)}">Copier le lien</button></div>`);
+  get(`qr?text=${encodeURIComponent(url)}`).then((r) => { const el = document.getElementById('qr'); if (el) el.innerHTML = r.svg; }, () => {});
+};
 document.addEventListener('focusin', (e) => { if (e.target.classList && e.target.classList.contains('select-all')) e.target.select(); });
 
 define('cercle', {
@@ -52,12 +57,14 @@ on('click', 'invite', () => {
   sheet(`<h3>Inviter un membre</h3><form class="stack" data-f="invite">
     <label>E-mail (facultatif)<input name="email" type="email" placeholder="lea@exemple.be"></label>
     <p class="small muted">${S.me.mail ? 'Avec une adresse, l’invitation est envoyée par e-mail.' : 'Les e-mails ne sont pas configurés : tu transmettras le lien toi-même (SMS, WhatsApp…).'}</p>
+    <label class="check"><input type="checkbox" name="multi"> 📱 Lien familial à scanner (QR code) : plusieurs personnes l’utilisent pendant 48 h, idéal pendant une réunion de famille</label>
     <label class="check"><input type="checkbox" name="isAdmin"> Administrateur du cercle</label>
     <div class="row end"><button type="button" class="btn ghost" data-a="close-sheet">Annuler</button><button class="btn main">Créer l’invitation</button></div></form>`);
 });
 on('submit', 'invite', async (form, f) => {
-  const r = await attempt(() => post('circle/invitations', { email: f.email || undefined, isAdmin: f.isAdmin }));
-  if (r) linkSheet('Lien d’invitation', r.url, `${r.sent ? 'Invitation envoyée par e-mail. ' : ''}Lien personnel valable 14 jours, utilisable une seule fois.`);
+  const r = await attempt(() => post('circle/invitations', f.multi ? { multi: true } : { email: f.email || undefined, isAdmin: f.isAdmin }));
+  if (r && f.multi) linkSheet('Lien familial', r.url, 'Chacun scanne le QR code avec l’appareil photo de son téléphone et crée son compte. Valable 48 heures, pour plusieurs personnes : ne le publie pas.');
+  else if (r) linkSheet('Lien d’invitation', r.url, `${r.sent ? 'Invitation envoyée par e-mail. ' : ''}Lien personnel valable 14 jours, utilisable une seule fois.`);
 });
 
 on('click', 'member-menu', (el) => {

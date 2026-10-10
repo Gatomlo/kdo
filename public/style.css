@@ -299,3 +299,7 @@ button.chiplet:hover, a.chiplet:hover { border-color: var(--plum) }
 .card.stack { display: flex }
 .card.stack-lg { display: flex }
 .hero .logo-img { border-radius: 20px; box-shadow: 0 12px 28px -12px rgba(217, 64, 90, .6) }
+
+.qr { width: min(240px, 70vw); margin: 0 auto; background: #fff; border-radius: 12px; padding: 6px }
+.qr:empty { display: none }
+.qr svg { display: block; width: 100%; height: auto }

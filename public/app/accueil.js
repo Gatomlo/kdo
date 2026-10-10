@@ -1,10 +1,27 @@
 // Tableau de bord : mon Secret Santa, evenements a venir, mes reservations, la famille.
-import { esc, eur, avatar, fmtDate } from './ui.js';
+import { esc, eur, avatar, fmtDate, on } from './ui.js';
 import { get } from './api.js';
-import { S } from './state.js';
+import { S, render } from './state.js';
 import { define } from './router.js';
 import { listCard, eventRow, empty } from './cards.js';
 import { installCard } from './install.js';
+
+// Premiers pas : disparaissent quand tout est fait ou si on les masque (par appareil).
+const stepsHidden = () => { try { return localStorage.getItem('kdo-steps-hidden') === '1'; } catch { return false; } };
+function firstSteps(s) {
+  const steps = [
+    [s.birthday, '🎂 Ajoute ton anniversaire', '#/moi'],
+    [s.fiche, '📏 Remplis ta fiche tailles', `#/fiche/${S.me.id}`],
+    [s.list, '🎁 Crée ta première liste', '#/listes/nouvelle'],
+    [s.idea, '💡 Note une idée secrète pour quelqu’un', '#/cercle'],
+  ];
+  const done = steps.filter(([d]) => d).length;
+  if (done === steps.length || stepsHidden()) return '';
+  return `<section class="card stack tight"><div class="between"><h2>Premiers pas</h2><span class="pill p-mgr">${done}/${steps.length}</span></div>
+    ${steps.map(([d, label, href]) => (d ? `<p class="small muted">✅ <s>${label.slice(label.indexOf(' ') + 1)}</s></p>` : `<a class="link" href="${href}">${label} ›</a>`)).join('')}
+    <button class="linkbtn small" data-a="steps-hide">Masquer</button></section>`;
+}
+on('click', 'steps-hide', () => { try { localStorage.setItem('kdo-steps-hidden', '1'); } catch { /* rien */ } render(); });
 
 define('', {
   load: () => get('dashboard'),
@@ -27,6 +44,7 @@ define('', {
       title: '', tab: '',
       body: `<div class="stack-lg">
         <p class="hello">Bonjour ${esc(S.me.name)} 👋</p>
+        ${firstSteps(d.steps)}
         ${envelopes ? `<section class="stack">${envelopes}</section>` : ''}
         <section class="stack"><div class="between"><h2>Événements à venir</h2><a class="link" href="#/evenements">Tout voir</a></div>
           ${d.events.length ? d.events.map(eventRow).join('') : empty('Aucun événement prévu. <a href="#/evenements/nouveau">En créer un</a>')}</section>

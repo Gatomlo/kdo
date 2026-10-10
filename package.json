@@ -16,6 +16,7 @@
   "dependencies": {
     "express": "^4.22.3",
     "nodemailer": "^6.10.1",
+    "qrcode-generator": "^1.4.4",
     "web-push": "^3.6.7"
   }
 }

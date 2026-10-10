@@ -142,3 +142,18 @@ test('idée secrète : vendeur et photo', async () => {
   assert.equal(i.image, 'https://exemple.be/t.jpg');
   assert.equal(i.shop, null, 'champ vidé');
 });
+
+test('lien familial : réutilisable 48 h, sans e-mail ni admin ; QR code', async () => {
+  assert.equal((await f.lea.post('/api/circle/invitations', { multi: true })).status, 403, 'admin seulement');
+  assert.equal((await f.thomas.post('/api/circle/invitations', { multi: true, email: 'x@y.be' })).status, 400);
+  const { url } = (await f.thomas.post('/api/circle/invitations', { multi: true, isAdmin: true })).data;
+  const invite = tokenOf(url, 'invite');
+  for (const n of ['Cousin', 'Cousine']) {
+    const c = client();
+    assert.equal((await c.post('/api/auth/register', { invite, name: n, email: `${n.toLowerCase()}@demo.be`, password: 'motdepasse123' })).status < 300, true, n);
+    assert.equal((await c.get('/api/me')).data.isAdmin, false);
+  }
+  const q = (await f.lea.get(`/api/qr?text=${encodeURIComponent(url)}`)).data;
+  assert.match(q.svg, /^<svg/);
+  assert.equal((await f.lea.get('/api/qr?text=javascript:1')).status, 400);
+});
