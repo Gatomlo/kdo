@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "hotte-demo",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["scripts/demo.js"],
+      "port": 3100
+    }
+  ]
+}

@@ -1,0 +1,98 @@
+// Point d'entree : connexion (mot de passe, invitation, lien e-mail), navigation par #,
+// cadre de l'ecran (en-tete, navigation en bas).
+import { esc, on, toast, avatar } from './ui.js';
+import { get, post, ApiError } from './api.js';
+import { S, setReloader, setRenderer, go } from './state.js';
+import { match } from './router.js';
+import { loginView, setPending, loadOptions, loadInvitation, resetPending } from './connexion.js';
+import './install.js'; // tot : retient l'invite d'installation du navigateur
+import './accueil.js';
+import './listes.js';
+import './evenements.js';
+import './cercle.js';
+
+const app = document.getElementById('app');
+
+const NAV = [
+  ['', 'Accueil', '<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>'],
+  ['listes', 'Listes', '<path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/>'],
+  ['evenements', 'Événements', '<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/>'],
+  ['cercle', 'Cercle', '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.3-5.5 6.5-5.5s5.7 1.9 6.5 5.5M16 4.5a3.5 3.5 0 010 7M18 14.8c1.9.7 3 2.4 3.5 5.2"/>'],
+];
+
+function shell(v) {
+  const tab = v.tab ?? S.route[0] ?? '';
+  const nav = v.noNav ? '' : `<nav class="tabs" aria-label="Navigation principale">${NAV.map(([k, t, svg]) => `<a href="#/${k}" ${tab === k ? 'aria-current="page"' : ''}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${svg}</svg><span>${t}</span></a>`).join('')}</nav>`;
+  const me = S.me && !v.noNav ? `<a href="#/moi" class="me" aria-label="Mon compte">${avatar(S.me)}</a>` : '';
+  app.className = 'shell' + (v.noNav ? ' nonav' : '');
+  const header = v.noNav && !v.title ? '' : `<header class="top">${v.back ? `<a class="back" href="${esc(v.back)}" aria-label="Retour">‹</a>` : ''}
+      ${v.title ? `<h2>${esc(v.title)}${v.sub ? `<small>${esc(v.sub)}</small>` : ''}</h2>` : '<a class="brand" href="#/">La <i>Hotte</i></a>'}
+      ${v.right || ''}${me}</header>`;
+  app.innerHTML = `${header}<main id="view" tabindex="-1">${v.body}</main>${nav}`;
+  document.title = v.title ? `${v.title} · La Hotte` : 'La Hotte';
+}
+
+let current = null; // { route, params }
+
+async function load() {
+  const path = location.hash.replace(/^#\/?/, '').replace(/\/$/, '');
+  if (!S.me || resetPending()) { S.route = ['login']; shell(loginView()); return; }
+  current = match(path);
+  if (!current) { go('#/'); return; }
+  S.route = path.split('/');
+  try {
+    S.data = current.route.load ? await current.route.load(current.params) : null;
+    shell(current.route.view(S.data, current.params));
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 401) { location.href = './'; return; }
+    shell({ title: 'Oups', back: '#/', body: `<div class="card error">${esc(e.message)}</div>` });
+  }
+}
+
+// Apres une action : on recharge les donnees et on garde le defilement.
+setReloader(async () => {
+  const y = window.scrollY;
+  await load();
+  window.scrollTo(0, y);
+});
+setRenderer(() => {
+  const y = window.scrollY;
+  if (!S.me || resetPending()) shell(loginView());
+  else if (current) shell(current.route.view(S.data, current.params));
+  window.scrollTo(0, y);
+});
+
+window.addEventListener('hashchange', () => { load().then(() => window.scrollTo(0, 0)); });
+on('click', 'go', (el) => go(el.dataset.to));
+
+// Mode clair / sombre (memorise sur l'appareil).
+on('click', 'theme', () => {
+  const root = document.documentElement;
+  const dark = root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+  root.dataset.theme = dark ? 'light' : 'dark';
+  try { localStorage.setItem('hotte-theme', root.dataset.theme); } catch { /* stockage indisponible */ }
+});
+try { const th = localStorage.getItem('hotte-theme'); if (th) document.documentElement.dataset.theme = th; } catch { /* idem */ }
+
+// Application installable (voir sw.js).
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+
+// ---------- Demarrage ----------
+async function boot() {
+  const params = new URLSearchParams(location.search);
+  const login = params.get('login');
+  setPending({ invite: params.get('invite'), reset: params.get('reset') });
+  if (login || params.get('invite') || params.get('reset')) history.replaceState(null, '', location.pathname + location.hash);
+  await loadOptions();
+  let loginError = null;
+  if (login) {
+    try { S.me = await post('auth/verify', { token: login }); } catch (e) { loginError = e.message; }
+  }
+  if (!S.me) S.me = await get('me').catch(() => null);
+  await loadInvitation();
+  await load();
+  if (loginError && !S.me) toast(loginError, true);
+}
+boot();
+
+export { load };
