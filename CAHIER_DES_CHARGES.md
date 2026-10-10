@@ -1,4 +1,4 @@
-# La Hotte — Cahier des charges (v0.5)
+# La Hotte — Cahier des charges (v0.6)
 
 Outil **privé et familial** de listes de souhaits, d'événements et de Secret Santa.
 Pas de vocation grand public, pas de modèle économique. Interface en français.
@@ -90,6 +90,14 @@ Permettre aux membres d'une famille de :
 - **Après la fête** : « reçu » par article, report des non-reçus vers la liste suivante, archivage.
 - **Mes cadeaux** : historique de ce que j'ai offert à qui et budget personnel par événement et par personne.
 - **Dupliquer** une liste.
+
+### 4.9 Compléments (v0.6)
+- **Partager une page vers La Hotte** depuis le téléphone (app installée, Android) : choix de la liste, article pré-rempli.
+- **Fiche tailles et préférences** par personne (tailles, pointure, bague, couleurs, aime / n'aime pas, a déjà), visible de la famille et des invités de ses listes.
+- **Recherche** dans les listes, articles, idées secrètes et fiches.
+- **Secret Santa** : 3 idées laissées à son Secret Santa ; duos dévoilés par l'organisateur après la fête.
+- **Journal de l'administrateur** : arrivées, invitations en attente (annulables), partages, activité — sans contenu de cadeau.
+- **Accessibilité** : texte agrandi, vue simplifiée (par appareil). Interface compacte : bouton d'ajout flottant, réglages dans l'en-tête, boutons-icônes.
 
 ## 5. Choix techniques (v0.4 : alignés sur Le Cabas et MyLittleLibraryV2)
 

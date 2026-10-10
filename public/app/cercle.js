@@ -7,10 +7,11 @@ import { empty } from './cards.js';
 
 // Ligne « anniversaire · idees » sous le nom d'un membre.
 function extras(m, ideas) {
-  const bd = m.birthDate ? `🎂 ${fmtDate(`2000${m.birthDate.slice(4)}`, { day: 'numeric', month: 'long' })}${m.birthdayLeadDays ? ` · liste ${m.birthdayLeadDays} j avant` : ''}` : '';
-  const birthday = m.canEditBirthday ? `<button class="linkbtn" data-a="birthday" data-id="${m.id}">${bd || '🎂 Ajouter l’anniversaire'}</button>` : bd ? `<span>${bd}</span>` : '';
-  const idea = m.me ? '' : `<a href="#/idees/${m.id}">💡 Idées${ideas[m.id] ? ` (${ideas[m.id]})` : ''}</a>`;
-  return birthday || idea ? `<span class="meta">${birthday}${idea}</span>` : '';
+  const bd = m.birthDate ? `🎂 ${fmtDate(`2000${m.birthDate.slice(4)}`, { day: 'numeric', month: 'short' })}` : '';
+  const lead = m.birthdayLeadDays ? `Liste créée ${m.birthdayLeadDays} jours avant` : 'Pas de liste automatique';
+  const birthday = m.canEditBirthday ? `<button class="chiplet" data-a="birthday" data-id="${m.id}" title="${bd ? lead : 'Ajouter l’anniversaire'}">${bd || '🎂 +'}</button>` : bd ? `<span class="chiplet">${bd}</span>` : '';
+  const idea = m.me ? '' : `<a class="chiplet" href="#/idees/${m.id}" title="Idées secrètes">💡${ideas[m.id] ? ` ${ideas[m.id]}` : ''}</a>`;
+  return `<span class="meta">${birthday}<a class="chiplet" href="#/fiche/${m.id}" title="Tailles et préférences">📏</a>${idea}</span>`;
 }
 
 const linkSheet = (title, url, text) => sheet(`<h3>${esc(title)}</h3><p class="muted small">${text}</p>
@@ -26,20 +27,20 @@ define('cercle', {
     const admin = S.me.isAdmin;
     return {
       title: 'Le cercle familial',
+      settings: admin ? '#/reglages' : null,
+      fab: admin ? { action: 'invite', label: 'Inviter' } : null,
       body: `<div class="stack-lg">
-        <section class="stack"><div class="between"><h2>Membres (${accounts.length})</h2>${admin ? '<button class="btn main sm" data-a="invite">+ Inviter</button>' : ''}</div>
+        <section class="stack"><h2>Membres (${accounts.length})</h2>
           ${accounts.map((m) => `<div class="card row">${avatar(m)}<span class="grow"><b>${esc(m.name)}</b>${m.me ? ' <span class="muted small">(moi)</span>' : ''}${m.isAdmin ? ' <span class="pill p-mgr">admin</span>' : ''}
-            ${m.email ? `<span class="meta">${esc(m.email)}</span>` : ''}${extras(m, d.ideas)}</span>
-            ${admin && !m.me ? `<button class="btn ghost sm" data-a="member-menu" data-id="${m.id}">Gérer</button>` : ''}</div>`).join('')}</section>
+${extras(m, d.ideas)}</span>
+            ${admin && !m.me ? `<button class="ib" data-a="member-menu" data-id="${m.id}" aria-label="Gérer ${esc(m.name)}" title="Gérer">⋯</button>` : ''}</div>`).join('')}</section>
         <section class="stack"><div class="between"><h2>Profils sans compte (${profiles.length})</h2><button class="btn plum sm" data-a="profile-new">+ Profil</button></div>
-          <p class="small muted">Enfants, aînés sans e-mail… Leurs listes sont pilotées par leurs gestionnaires, qui voient et gèrent les réservations.</p>
           ${profiles.length ? profiles.map((p) => `<div class="card row">${avatar(p)}<span class="grow"><b>${esc(p.name)}</b>${p.iManage ? ' <span class="pill p-mgr">je gère</span>' : ''}
-            <span class="meta">Gestion : ${p.managers.map((id) => esc((byId.get(id) || {}).name || '?')).join(', ')}</span>${extras(p, d.ideas)}</span>
-            ${p.iManage || admin ? `<button class="btn ghost sm" data-a="profile-menu" data-id="${p.id}">Gérer</button>` : ''}</div>`).join('') : empty('Aucun profil sans compte.')}</section>
+${extras(p, d.ideas)}<span class="meta">géré par ${p.managers.map((id) => esc((byId.get(id) || {}).name || '?')).join(', ')}</span></span>
+            ${p.iManage || admin ? `<button class="ib" data-a="profile-menu" data-id="${p.id}" aria-label="Gérer ${esc(p.name)}" title="Gérer">⋯</button>` : ''}</div>`).join('') : empty('Aucun profil sans compte.')}</section>
         ${admin && d.guests.length ? `<section class="stack"><h2>Invités hors cercle (${d.guests.length})</h2>
           <p class="small muted">Venus par le lien de partage d’une liste ; ils ne voient que cette liste.</p>
           ${d.guests.map((g) => `<div class="card row">${avatar(g, 'sm')}<span class="grow"><b>${esc(g.name)}</b><span class="meta">${esc(g.listTitle)}${g.email ? ` · ${esc(g.email)}` : ''}</span></span><button class="btn danger-t sm" data-a="member-del" data-id="${g.id}" data-guest="1" data-name="${esc(g.name)}">Retirer</button></div>`).join('')}</section>` : ''}
-        ${admin ? '<a class="card row" href="#/reglages"><span class="cover">⚙️</span><span class="grow"><b>Réglages de l’app</b><span class="meta">E-mails (SMTP), adresse publique des liens</span></span>→</a>' : ''}
       </div>`,
     };
   },
@@ -61,7 +62,7 @@ on('submit', 'invite', async (form, f) => {
 
 on('click', 'member-menu', (el) => {
   const m = member(el.dataset.id);
-  sheet(`<h3>${esc(m.name)}</h3><div class="stack">
+  sheet(`<h3>${esc(m.name)}</h3>${m.email ? `<p class="small muted">${esc(m.email)}</p>` : ''}<div class="stack">
     <button class="btn ghost" data-a="reset-link" data-id="${m.id}">🔑 Lien de nouveau mot de passe</button>
     <button class="btn ghost" data-a="toggle-admin" data-id="${m.id}">${m.isAdmin ? 'Retirer les droits d’administration' : 'Rendre administrateur'}</button>
     <button class="btn danger-t" data-a="member-del" data-id="${m.id}">Retirer du cercle</button></div>`);
@@ -141,6 +142,7 @@ define('reglages', {
   view: (s) => ({
     title: 'Réglages de l’app', back: '#/cercle', tab: 'cercle',
     body: `<div class="stack-lg">
+      <a class="card lc" href="#/journal"><span class="cover">📒</span><span class="grow"><b>Journal</b><span class="meta">Arrivées, invitations en attente, partages, activité</span></span>→</a>
       <form class="card stack" data-f="settings-mail"><h2>E-mails</h2>
         <p class="small muted">Facultatif. Sans serveur d’envoi, tout fonctionne avec des liens à copier. Avec : lien de connexion par e-mail, invitations envoyées, notifications (article réservé modifié, enveloppe Secret Santa, rappel une semaine avant l’événement…).</p>
         <p class="banner ${s.mode === 'off' ? 'info' : 'hide'}">${s.mode === 'off' ? '📭 <span>Envoi désactivé.</span>' : s.forced ? `🔧 <span>Mode imposé par le serveur : <b>${esc(s.mode)}</b>.</span>` : s.envFallback ? '✉️ <span>Envoi actif (configuré sur le serveur).</span>' : '✉️ <span>Envoi actif.</span>'}</p>
@@ -202,12 +204,16 @@ define('moi', {
       <section class="card stack"><h2>🎂 Mon anniversaire</h2>
         <p class="small muted">${d.self.birthDate ? `${fmtDate(`2000${d.self.birthDate.slice(4)}`, { day: 'numeric', month: 'long' })}${d.self.birthdayLeadDays ? ` · ta liste est créée ${d.self.birthdayLeadDays} jours avant` : ' · pas de liste automatique'}` : 'Pas encore renseigné.'}</p>
         <button class="btn ghost" data-a="birthday" data-id="${d.self.id}">${d.self.birthDate ? 'Modifier' : 'Ajouter mon anniversaire'}</button></section>
+      <a class="card lc" href="#/fiche/${d.self.id}"><span class="cover">📏</span><span class="grow"><b>Ma fiche tailles et préférences</b><span class="meta">Tailles, pointure, couleurs, ce que j’aime ou pas</span></span>→</a>
       ${pushSection(d.push)}
+      <section class="card stack"><h2>Affichage sur cet appareil</h2>
+        <label class="check"><input type="checkbox" data-ch="display" data-k="hotte-big" ${document.documentElement.classList.contains('big') ? 'checked' : ''}> Texte plus grand</label>
+        <label class="check"><input type="checkbox" data-ch="display" data-k="hotte-simple" ${document.documentElement.classList.contains('simple') ? 'checked' : ''}> Vue simplifiée (gros boutons, sans discussions ni filtres)</label>
+        <button class="btn ghost" data-a="theme">◐ Mode clair / sombre</button></section>
       ${d.me.profiles.length ? `<section class="card stack"><h2>Profils que je gère</h2>${d.me.profiles.map((p) => `<div class="row">${avatar(p, 'sm')}<span class="grow">${esc(p.name)}</span><a class="link" href="#/listes/nouvelle">+ liste</a></div>`).join('')}</section>` : ''}
       <section class="stack"><a class="btn ghost" href="#/mes-cadeaux">🎁 Mes cadeaux : budget et historique</a>
         <a class="btn ghost" href="api/export" download>⬇️ Exporter les données (JSON)</a>
         <p class="small muted">Sans les cadeaux de tes propres listes : pas de spoiler, même dans l’export.</p>
-        <button class="btn ghost" data-a="theme">◐ Mode clair / sombre</button>
         <button class="btn danger-t" data-a="logout">Se déconnecter</button></section>
     </div>`,
   }),

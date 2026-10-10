@@ -69,6 +69,7 @@ async function seed() {
   const soon = new Date(Date.now() + 20 * 86400000).toISOString().slice(5, 10);
   await lea.c('PUT', `circle/members/${lea.id}/birthday`, { birthDate: `1992-${soon}`, leadDays: 30 });
   await thomas('PUT', `circle/members/${leon}/birthday`, { birthDate: '2021-04-02', leadDays: 45 });
+  await lea.c('PUT', `fiches/${lea.id}`, { top: 'M', bottom: '38', shoes: '38', colors: 'vert, bleu nuit', likes: 'jardinage, polars, thé', dislikes: 'bibelots ; allergie aux noix' });
   await marc.c('POST', `ideas/${lea.id}`, { title: 'Cours de poterie', price: '60', note: 'Elle en a parlé à Pâques' });
   await mamy.c('POST', `ideas/${lea.id}`, { title: 'Abonnement à un magazine de jardinage' });
 

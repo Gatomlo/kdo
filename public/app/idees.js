@@ -11,7 +11,7 @@ define('idees/:mid', {
     const r = d.recipient;
     return {
       title: `Idées pour ${r.name}`, back: '#/cercle', tab: 'cercle',
-      right: '<button class="btn main sm" data-a="idea-new">+ Idée</button>',
+      fab: { action: 'idea-new', label: 'Idée' },
       body: `<div class="stack-lg">
         <p class="banner hide">🤫 <span>Ces idées sont invisibles pour <b>${esc(r.name)}</b>. Note ce que tu entends (« elle rêve d’un cours de poterie ») ; « je m’en occupe » évite les doublons.</span></p>
         ${d.ideas.length ? d.ideas.map((i) => `<article class="card stack tight${i.takenBy ? ' taken' : ''}">

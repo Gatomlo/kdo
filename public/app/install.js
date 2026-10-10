@@ -12,9 +12,11 @@ const isIos = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.
 const isAndroid = () => /android/i.test(navigator.userAgent);
 
 // Carte « Installer l'app », rien si l'app tourne deja installee.
-export const installCard = () => (isInstalled() ? '' : `<button class="card click row install" data-a="install">
-  <img src="icon.svg" alt="" width="40" height="40"><span class="grow"><b>Installer l’app</b>
-  <span class="meta">Icône sur l’écran d’accueil, plein écran</span></span></button>`);
+const dismissed = () => { try { return localStorage.getItem('hotte-install-hidden') === '1'; } catch { return false; } };
+export const installCard = () => (isInstalled() || dismissed() ? '' : `<div class="card row install"><img src="icon.svg" alt="" width="36" height="36">
+  <button class="grow linkish" data-a="install"><b>Installer l’app</b><span class="meta">Icône sur l’écran d’accueil, notifications, partage de liens</span></button>
+  <button class="icon" data-a="install-hide" aria-label="Masquer">✕</button></div>`);
+on('click', 'install-hide', () => { try { localStorage.setItem('hotte-install-hidden', '1'); } catch { /* rien */ } render(); });
 
 const step = (n, html) => `<div class="row top"><span class="pill p-buy">${n}</span><span class="grow">${html}</span></div>`;
 

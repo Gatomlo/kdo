@@ -2,7 +2,7 @@
 // fiche article, reglages (infos, categories, roles, archivage).
 // Le serveur n'envoie les donnees de cadeaux (item.gifts, offList) qu'aux offrants et
 // gestionnaires : l'interface se contente d'afficher ce qu'elle recoit.
-import { esc, on, toast, sheet, confirmSheet, eur, eurInput, fmtDate, stars, avatar, host } from './ui.js';
+import { esc, on, toast, sheet, closeSheet, confirmSheet, eur, eurInput, fmtDate, stars, avatar, host } from './ui.js';
 import { get, post, patch, put, del, attempt, uploadPhoto } from './api.js';
 import { S, reload, render, go } from './state.js';
 import { define } from './router.js';
@@ -20,7 +20,7 @@ define('listes', {
     const others = lists.filter((l) => l.role === 'viewer');
     return {
       title: S.q.archived ? 'Listes archivées' : 'Les listes',
-      right: '<a class="btn main sm" href="#/listes/nouvelle">+ Nouvelle</a>',
+      fab: { href: '#/listes/nouvelle', label: 'Liste' },
       body: `<div class="stack-lg">
         <section class="stack"><h2>Mes listes <span class="muted small">(et celles que je gère)</span></h2>${mine.length ? mine.map(listCard).join('') : empty('Aucune liste.')}</section>
         <section class="stack"><h2>La famille</h2>${others.length ? others.map(listCard).join('') : empty('Personne n’a encore publié de liste.')}</section>
@@ -79,135 +79,182 @@ define('listes/:id', {
     const groups = [...d.categories.map((c) => ({ name: c.name, items: visible.filter((i) => i.categoryId === c.id) })),
       { name: d.categories.length ? 'Autres' : '', items: visible.filter((i) => i.categoryId == null || !known.has(i.categoryId)) }].filter((g) => g.items.length);
     const used = d.categories.filter((c) => d.items.some((i) => i.categoryId === c.id));
-    const order = d.items.map((i) => i.id);
-    const banners = [
-      d.canSeeGifts ? `<p class="banner hide">🤫 <span>Vue offrant : ne montre pas cet écran à <b>${esc(owner.name)}</b>.</span></p>` : '',
-      d.role === 'owner' ? '<p class="banner info">🙈 <span>C’est ta liste : les réservations te restent cachées, quel que soit le chemin pour arriver ici.</span></p>' : '',
-      d.role === 'co_owner' ? '<p class="banner info">🙈 <span>Tu es co-propriétaire de cette liste : les réservations te restent cachées.</span></p>' : '',
-      d.role === 'manager' ? '<p class="banner info">🛡️ <span>Tu es <b>gestionnaire</b> : tu modifies les articles et tu gères les réservations.</span></p>' : '',
-    ].join('');
-    const filters = d.items.length ? `<div class="stack">
-        ${used.length ? `<div class="chips" role="group" aria-label="Catégories"><button class="chip" data-a="f-cat" data-v="all" aria-pressed="${q.cat === 'all'}">Tout</button>${used.map((c) => `<button class="chip" data-a="f-cat" data-v="${c.id}" aria-pressed="${q.cat === c.id}">${esc(c.name)}</button>`).join('')}</div>` : ''}
-        <div class="row wrap small"><label class="check">Priorité <select data-ch="f-prio">${[[0, 'toutes'], [2, '★★ et +'], [3, '★★★']].map(([v, l]) => `<option value="${v}" ${q.prio === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
-        ${d.canSeeGifts ? `<label class="check"><input type="checkbox" data-ch="f-free" ${q.free ? 'checked' : ''}> Disponibles seulement</label>` : ''}</div></div>` : '';
+    // Une seule ligne d'information selon le role (vue epuree).
+    const f = d.ownerFiche;
+    const ficheRows = f ? [['👕 Haut', f.top], ['👖 Bas', f.bottom], ['👟 Pointure', f.shoes], ['💍 Bague', f.ring], ['🎨 Couleurs', f.colors], ['❤️ Aime', f.likes], ['🚫 N’aime pas / allergies', f.dislikes], ['📦 A déjà', f.has]].filter(([, v]) => v) : [];
+    // Infos repliees derriere ℹ️ : message d'accueil, fiche, evenement, idees, role.
+    const info = q.info ? `<div class="infos stack tight">
+        ${list.welcome ? `<p class="welcome">${esc(list.welcome)}</p>` : ''}
+        ${d.event ? `<p class="small">📅 ${d.guest ? esc(d.event.title) : `<a href="#/evenements/${d.event.id}">${esc(d.event.title)}</a>`}</p>` : ''}
+        <p class="small muted">${d.canSeeGifts ? `🤫 Vue offrant : ne montre pas cet écran à ${esc(owner.name)}.${d.role === 'manager' ? ' Tu es gestionnaire : tu modifies les articles et gères les réservations.' : ''}` : `🙈 ${d.role === 'owner' ? 'Ta liste' : 'Tu es co-propriétaire'} : les réservations te restent cachées.`}</p>
+        ${ficheRows.length ? `<dl class="fiche-dl">${ficheRows.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join('')}</dl>` : ''}
+        <p class="row wrap small">${!d.guest && (d.role === 'owner' || d.role === 'manager') ? `<a href="#/fiche/${owner.id}">📏 ${ficheRows.length ? 'Modifier la fiche' : 'Remplir la fiche tailles'}</a>` : ''}
+          ${d.role === 'viewer' && !d.guest ? `<a href="#/idees/${owner.id}">💡 Idées secrètes</a>` : ''}</p></div>` : '';
+    const hasInfo = list.welcome || d.event || ficheRows.length || d.role !== 'viewer' || !d.guest;
+    const chips = d.items.length > 5 ? `<div class="chips" role="group" aria-label="Filtres">
+        <button class="chip" data-a="f-cat" data-v="all" aria-pressed="${q.cat === 'all' && !q.free && !q.prio}">Tout</button>
+        ${d.canSeeGifts ? `<button class="chip" data-a="f-free" aria-pressed="${q.free}">Disponibles</button>` : ''}
+        <button class="chip" data-a="f-prio" aria-pressed="${q.prio === 3}">★★★</button>
+        ${used.length > 1 ? used.map((c) => `<button class="chip" data-a="f-cat" data-v="${c.id}" aria-pressed="${q.cat === c.id}">${esc(c.name)}</button>`).join('') : ''}</div>` : '';
     return {
       title: list.title, back: d.guest ? null : '#/listes', tab: 'listes',
+      settings: d.canEdit && !d.guest ? `#/listes/${list.id}/reglages` : null,
+      fab: d.canEdit ? { href: `#/listes/${list.id}/article/nouveau`, label: 'Article' } : null,
       body: `<div class="stack-lg">
-        <header class="stack">
-          <div class="row"><span class="cover big" aria-hidden="true">${esc(list.cover)}</span>
-            <div class="grow"><p class="meta">${avatar(owner, 'sm')} ${esc(owner.name)}${d.roles.filter((r) => r.role === 'co_owner').map((r) => ` & ${esc(r.name)}`).join('')}${list.date ? ` · ${fmtDate(list.date)}` : ''}${list.archived ? ' · <span class="pill p-buy">archivée</span>' : ''}</p>
-            ${d.event ? `<p class="small">Événement : ${d.guest ? esc(d.event.title) : `<a href="#/evenements/${d.event.id}">${esc(d.event.title)}</a>`}</p>` : ''}</div></div>
-          ${list.welcome ? `<p class="card welcome">${esc(list.welcome)}</p>` : ''}
-          ${banners}
-          ${d.role === 'viewer' && !d.guest ? `<a class="link" href="#/idees/${owner.id}">💡 Idées secrètes pour ${esc(owner.name)}</a>` : ''}
-          ${d.canEdit ? `<div class="row wrap"><a class="btn main" href="#/listes/${list.id}/article/nouveau">+ Ajouter un article</a><a class="btn ghost" href="#/listes/${list.id}/reglages">Réglages</a></div>` : ''}
+        <header class="listhead">
+          <div class="row"><span class="cover" aria-hidden="true">${esc(list.cover)}</span>
+            <p class="meta grow">${avatar(owner, 'sm')} ${esc(owner.name)}${d.roles.filter((r) => r.role === 'co_owner').map((r) => ` & ${esc(r.name)}`).join('')}${list.date ? ` · ${fmtDate(list.date, { day: 'numeric', month: 'short' })}` : ''}
+              ${list.archived ? '<span class="pill p-buy">archivée</span>' : ''}${d.canSeeGifts ? `<span class="pill p-hide" title="Ne montre pas cet écran à ${esc(owner.name)}">🤫 caché à ${esc(owner.name)}</span>` : '<span class="pill p-mgr" title="Les réservations te restent cachées">🙈 sans spoiler</span>'}</p>
+            ${hasInfo ? `<button class="ib" data-a="list-info" aria-expanded="${!!q.info}" aria-label="Informations" title="Informations">ℹ️</button>` : ''}</div>
+          ${info}
         </header>
-        ${filters}
-        ${groups.length ? groups.map((g) => `<section class="stack">${g.name ? `<h3 class="tag">${esc(g.name)}</h3>` : ''}${g.items.map((i) => itemCard(i, d, order)).join('')}</section>`).join('')
-          : empty(d.items.length ? 'Aucun article ne correspond aux filtres.' : d.canEdit ? 'Cette liste est encore vide : ajoute ton premier souhait.' : 'Cette liste est encore vide.')}
+        ${chips}
+        ${groups.length ? groups.map((g) => `<section class="stack">${g.name ? `<h3 class="tag">${esc(g.name)}</h3>` : ''}${g.items.map((i) => itemCard(i, d)).join('')}</section>`).join('')
+          : empty(d.items.length ? 'Aucun article ne correspond aux filtres.' : d.canEdit ? 'Cette liste est encore vide : touche « + Article ».' : 'Cette liste est encore vide.')}
         ${d.offList ? offListSection(d) : ''}
       </div>`,
     };
   },
 });
-on('click', 'f-cat', (el) => { S.q.cat = el.dataset.v === 'all' || el.dataset.v === 'none' ? el.dataset.v : Number(el.dataset.v); render(); });
-on('change', 'f-prio', (el) => { S.q.prio = Number(el.value); render(); });
-on('change', 'f-free', (el) => { S.q.free = el.checked; render(); });
+on('click', 'f-cat', (el) => {
+  if (el.dataset.v === 'all') { S.q.cat = 'all'; S.q.free = false; S.q.prio = 0; } else S.q.cat = S.q.cat === Number(el.dataset.v) ? 'all' : Number(el.dataset.v);
+  render();
+});
+on('click', 'list-info', () => { S.q.info = !S.q.info; render(); });
+on('click', 'item-open', (el) => {
+  const id = Number(el.dataset.id);
+  S.q.open = S.q.open === id ? null : id;
+  render();
+});
+on('click', 'f-prio', () => { S.q.prio = S.q.prio === 3 ? 0 : 3; render(); });
+on('click', 'f-free', () => { S.q.free = !S.q.free; render(); });
 
-function itemCard(i, d, order) {
+// Article : une ligne compacte (vignette, titre, ★ prix, statut, action rapide en icone) ;
+// touche = deplier (precisions, liens, reservations, discussion).
+const DOT = { free: ['dot-free', 'Disponible'], reserved: ['dot-res', 'Réservé'], bought: ['dot-buy', 'Acheté'] };
+const ib = (a, id, icon, label, extra = '') => `<button class="ib" data-a="${a}" data-id="${id}" ${extra} aria-label="${label}" title="${label}">${icon}<span class="lbl">${label}</span></button>`;
+
+function itemCard(i, d) {
   const g = i.gifts;
-  const links = [i.url, i.url2].filter(Boolean).map((u) => `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(host(u))} ↗</a>`).join('');
-  const pos = order.indexOf(i.id);
-  return `<article class="item${g && g.status === 'bought' ? ' done' : ''}" data-item="${i.id}" ${d.canEdit ? 'draggable="true"' : ''}>
+  const open = S.q.open === i.id;
+  const mine = g ? g.reservations.filter((r) => r.mine) : [];
+  let quick = '';
+  if (g && !i.received && g.status !== 'bought') {
+    if (i.groupGift) quick = ib('participate-sheet', i.id, '💶', mine.length ? 'Ma part' : 'Participer', 'class="ib primary"');
+    else if (g.available > 0) quick = ib('reserve', i.id, '🎁', 'Je réserve', 'class="ib primary"');
+  }
+  if (d.canEdit) quick += ib('item-menu', i.id, '⋯', 'Actions');
+  const status = i.received ? '<span class="dot dot-buy" title="Reçu">🎉</span>'
+    : g ? `<span class="dot ${DOT[g.status][0]}" title="${DOT[g.status][1]}" aria-label="${DOT[g.status][1]}"></span>` : '';
+  const meta = [
+    `<span class="stars" title="Priorité ${i.priority}/3">${stars(i.priority)}</span>`,
+    i.price != null ? `<span class="price">${eur(i.price)}</span>` : '',
+    i.quantity > 1 ? `<span>${g ? `${g.taken}/${i.quantity}` : `×${i.quantity}`}</span>` : '',
+    i.groupGift && g && i.price ? `<span>💶 ${Math.round((g.funded / i.price) * 100)} %</span>` : i.groupGift ? '<span>💶 commun</span>' : '',
+    mine.length ? `<span class="pill p-res">${mine.some((r) => r.status === 'bought') ? '✓ acheté' : 'à moi'}</span>` : g && g.reservations.length && !i.groupGift ? `<span>${esc(g.reservations.map((r) => r.giverName).join(', '))}</span>` : '',
+    g && g.comments.length ? `<span>💬 ${g.comments.length}</span>` : '',
+  ].filter(Boolean).join('');
+  return `<article class="item${g && g.status === 'bought' || i.received ? ' done' : ''}${open ? ' open' : ''}" data-item="${i.id}" ${d.canEdit ? 'draggable="true"' : ''}>
     <div class="thumb">${i.image ? `<button class="zoom" data-a="photo-zoom" data-src="${esc(i.image)}" data-title="${esc(i.title)}" aria-label="Agrandir la photo"><img src="${esc(i.image)}" alt="" loading="lazy" referrerpolicy="no-referrer"></button>` : '🎁'}</div>
-    <div class="body">
-      <div class="between"><b class="title">${esc(i.title)}</b>${i.received ? '<span class="pill p-free">reçu 🎉</span>' : g ? `<span class="pill ${STATUS[g.status][1]}">${STATUS[g.status][0]}</span>` : ''}</div>
-      <div class="meta"><span class="stars" title="Priorité ${i.priority}/3">${stars(i.priority)}</span>
-        ${i.price != null ? `<span class="price">${eur(i.price)}</span>` : ''}
-        ${i.quantity > 1 ? `<span>${g ? `${g.taken} sur ${i.quantity} pris` : `× ${i.quantity}`}</span>` : ''}
-        ${i.groupGift ? '<span class="pill p-mgr">cadeau commun</span>' : ''}${links}</div>
-      ${i.description ? `<p class="desc">${esc(i.description)}</p>` : ''}
-      ${g ? giftBlock(i, d) : ''}
-      ${d.canEdit ? `<div class="row wrap edit">
-        <a class="btn ghost sm" href="#/listes/${d.list.id}/article/${i.id}">Modifier</a>
-        <button class="btn ghost sm" data-a="item-move" data-id="${i.id}" data-dir="-1" ${pos === 0 ? 'disabled' : ''} aria-label="Monter">↑</button>
-        <button class="btn ghost sm" data-a="item-move" data-id="${i.id}" data-dir="1" ${pos === order.length - 1 ? 'disabled' : ''} aria-label="Descendre">↓</button>
-        <button class="btn danger-t sm" data-a="item-del" data-id="${i.id}" data-title="${esc(i.title)}">Supprimer</button>
-        <button class="btn ghost sm" data-a="item-received" data-id="${i.id}" data-v="${i.received ? '' : '1'}">${i.received ? 'Pas reçu' : 'Reçu ✓'}</button></div>` : ''}
-    </div></article>`;
+    <button class="body linkish" data-a="item-open" data-id="${i.id}" aria-expanded="${open}"><b class="title">${esc(i.title)}</b><span class="meta">${meta}</span></button>
+    <div class="side">${status}${quick}</div>
+    ${open ? itemDetails(i, d) : ''}
+  </article>`;
 }
 
-function giftBlock(i, d) {
+function itemDetails(i, d) {
   const g = i.gifts;
-  const meName = d.actors[0] && d.actors[0].name;
-  const who = (r) => (r.mine ? (r.giverName === meName ? 'Toi' : `Toi (pour ${esc(r.giverName)})`) : esc(r.giverName));
-  const asSelect = d.actors.length > 1 ? `<select name="asId" aria-label="Offert par">${d.actors.map((a, k) => `<option value="${a.id}">${k ? `De ${esc(a.name)}` : 'De moi'}</option>`).join('')}</select>` : '';
-  const reassign = (r) => (d.canManageGifts && !r.mine ? `<select data-ch="res-reassign" data-id="${r.id}" aria-label="Réattribuer">${d.members.map((m) => `<option value="${m.id}" ${m.id === r.giverId ? 'selected' : ''}>${esc(m.name)}</option>`).join('')}</select>` : '');
-  const actions = (r, carrierRule) => (r.mine || d.canManageGifts ? `<span class="row">
-      ${carrierRule ? '' : r.status === 'bought' ? `<button class="linkbtn" data-a="res-status" data-id="${r.id}" data-v="reserved">pas encore acheté</button>` : `<button class="linkbtn" data-a="res-status" data-id="${r.id}" data-v="bought">marquer acheté</button>`}
-      <button class="linkbtn" data-a="res-cancel" data-id="${r.id}">${r.amount != null ? 'retirer' : 'annuler'}</button></span>` : '');
-  let html = '';
-  if (i.groupGift) {
-    const parts = g.reservations;
-    const mine = parts.find((r) => r.mine);
-    html += `<div class="stack tight">${i.price ? `<div class="gauge" role="meter" aria-valuemin="0" aria-valuemax="${i.price}" aria-valuenow="${g.funded}" aria-label="Financement"><i style="width:${Math.min(100, (g.funded / i.price) * 100)}%"></i></div>
-      <span class="small muted">${eur(g.funded)} réunis sur ${eur(i.price)}</span>` : ''}
-      ${parts.map((r) => `<div class="res"><span>${who(r)} · ${eur(r.amount)} ${r.isCarrier ? '<span class="pill p-mgr">porteur</span>' : ''}</span>
-        ${r.mine || d.canManageGifts ? `<span class="row">${r.isCarrier ? '' : `<button class="linkbtn" data-a="res-carrier" data-id="${r.id}">porter l’achat</button>`}
-          ${r.isCarrier || d.canManageGifts ? (g.status === 'bought' ? `<button class="linkbtn" data-a="res-status" data-id="${r.id}" data-v="reserved">pas encore acheté</button>` : `<button class="linkbtn" data-a="res-status" data-id="${r.id}" data-v="bought">marquer acheté</button>`) : ''}
-          <button class="linkbtn" data-a="res-cancel" data-id="${r.id}">retirer</button></span>` : ''}${reassign(r)}</div>`).join('')}
-      ${g.status !== 'bought' ? `<div class="row wrap act">${asSelect}<input name="amount" inputmode="decimal" placeholder="Montant €" class="amount" value="${mine ? esc(eurInput(mine.amount)) : ''}"><button class="btn main sm" data-a="participate" data-id="${i.id}">${mine ? 'Modifier ma part' : 'Participer'}</button></div>` : ''}</div>`;
-  } else {
-    html += g.reservations.map((r) => `<div class="res"><span>${who(r)}${i.quantity > 1 ? ` × ${r.quantity}` : ''} · ${r.status === 'bought' ? 'acheté ✓' : 'réservé'}</span>${actions(r, false)}${reassign(r)}</div>`).join('');
-    if (g.available > 0) {
-      html += `<div class="row wrap act">${asSelect}${g.available > 1 ? `<select name="quantity" aria-label="Quantité">${Array.from({ length: g.available }, (_, k) => `<option>${k + 1}</option>`).join('')}</select>` : ''}
-        <button class="btn main sm" data-a="reserve" data-id="${i.id}">Je réserve</button></div>`;
-    }
+  const links = [i.url, i.url2].filter(Boolean).map((u) => `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">🔗 ${esc(host(u))}</a>`).join('');
+  let html = `${i.description ? `<p class="desc">${esc(i.description)}</p>` : ''}${links ? `<p class="row wrap small">${links}</p>` : ''}`;
+  if (g) {
+    const meName = d.actors[0] && d.actors[0].name;
+    const who = (r) => (r.mine ? (r.giverName === meName ? 'Toi' : `Toi (pour ${esc(r.giverName)})`) : esc(r.giverName));
+    if (i.groupGift && i.price) html += `<div class="gauge" role="meter" aria-valuemin="0" aria-valuemax="${i.price}" aria-valuenow="${g.funded}" aria-label="Financement"><i style="width:${Math.min(100, (g.funded / i.price) * 100)}%"></i></div><p class="small muted">${eur(g.funded)} réunis sur ${eur(i.price)}</p>`;
+    html += g.reservations.map((r) => {
+      const can = r.mine || d.canManageGifts;
+      const canBuy = r.amount == null || r.isCarrier || d.canManageGifts;
+      const acts = can ? [
+        r.amount != null && !r.isCarrier ? ib('res-carrier', r.id, '🛍️', 'Je porte l’achat') : '',
+        canBuy ? (r.status === 'bought' ? ib('res-status', r.id, '↩️', 'Pas encore acheté', 'data-v="reserved"') : ib('res-status', r.id, '✅', 'Marquer acheté', 'data-v="bought"')) : '',
+        d.canManageGifts && !r.mine ? ib('res-reassign-sheet', r.id, '👤', 'Réattribuer') : '',
+        ib('res-cancel', r.id, '✕', r.amount != null ? 'Retirer ma part' : 'Annuler'),
+      ].join('') : '';
+      return `<div class="res"><span>${who(r)}${r.amount != null ? ` · ${eur(r.amount)}` : i.quantity > 1 ? ` × ${r.quantity}` : ''}${r.isCarrier ? ' · porteur' : ''} · ${r.status === 'bought' ? 'acheté' : 'réservé'}</span><span class="row">${acts}</span></div>`;
+    }).join('');
+    html += `<div class="thread stack tight">${g.comments.map((c) => `<p class="small"><b>${esc(c.author)}</b> ${esc(c.body)}</p>`).join('')}
+      <form class="row" data-f="comment" data-id="${i.id}"><input name="body" maxlength="1000" placeholder="💬 Message aux autres offrants…" required class="grow"><button class="ib" aria-label="Envoyer" title="Envoyer">➤</button></form></div>`;
   }
-  html += `<details class="thread" ${String(S.q.openThread) === String(i.id) ? 'open' : ''}><summary>💬 Discussion entre offrants${g.comments.length ? ` (${g.comments.length})` : ''}</summary>
-    <div class="stack tight">${g.comments.map((c) => `<p class="small"><b>${esc(c.author)}</b> — ${esc(c.body)}</p>`).join('')}
-    <form class="row" data-f="comment" data-id="${i.id}"><input name="body" maxlength="1000" placeholder="Je l’ai vu moins cher chez…" required class="grow"><button class="btn sm">Envoyer</button></form></div></details>`;
-  return html;
+  return `<div class="details">${html}</div>`;
 }
 
 function offListSection(d) {
   const asSelect = d.actors.length > 1 ? `<select name="asId">${d.actors.map((a, k) => `<option value="${a.id}">${k ? `De ${esc(a.name)}` : 'De moi'}</option>`).join('')}</select>` : '';
-  return `<section class="stack"><h2>Cadeaux hors liste</h2>
-    <p class="small muted">Pour éviter les doublons : ce que d’autres offrent en dehors de la liste (invisible pour ${esc(d.owner.name)}).</p>
-    ${d.offList.map((o) => `<div class="card between small"><span><b>${esc(o.giverName)}</b> offre : ${esc(o.description)}</span>${o.mine || d.canManageGifts ? `<button class="linkbtn" data-a="offlist-del" data-id="${o.id}">retirer</button>` : ''}</div>`).join('')}
-    <form class="row wrap" data-f="offlist">${asSelect}<input name="description" maxlength="300" placeholder="J’offre autre chose : un pull vert…" required class="grow"><button class="btn">Noter</button></form></section>`;
+  return `<details class="offlist fiche"><summary>🎀 Cadeaux hors liste${d.offList.length ? ` (${d.offList.length})` : ''}</summary><div class="stack tight">
+    <p class="small muted">Ce que d’autres offrent en dehors de la liste, pour éviter les doublons (invisible pour ${esc(d.owner.name)}).</p>
+    ${d.offList.map((o) => `<div class="res"><span><b>${esc(o.giverName)}</b> : ${esc(o.description)}</span>${o.mine || d.canManageGifts ? `<button class="ib" data-a="offlist-del" data-id="${o.id}" aria-label="Retirer" title="Retirer">✕</button>` : ''}</div>`).join('')}
+    <form class="row wrap" data-f="offlist">${asSelect}<input name="description" maxlength="300" placeholder="J’offre autre chose : un pull vert…" required class="grow"><button class="ib" aria-label="Noter" title="Noter">➤</button></form></div></details>`;
 }
 
 const listId = () => S.data.list.id;
 on('click', 'photo-zoom', (el) => sheet(`<h3>${esc(el.dataset.title)}</h3><img class="photo-big" src="${esc(el.dataset.src)}" alt="Photo : ${esc(el.dataset.title)}" referrerpolicy="no-referrer"><div class="row end"><button class="btn ghost" data-a="close-sheet">Fermer</button></div>`));
-const cardOf = (el) => el.closest('[data-item]');
 
+const asSelect = () => (S.data.actors.length > 1 ? `<label>De la part de<select name="asId">${S.data.actors.map((a, k) => `<option value="${a.id}">${k ? esc(a.name) : 'moi'}</option>`).join('')}</select></label>` : '');
 on('click', 'reserve', async (el) => {
-  const c = cardOf(el);
-  const qty = c.querySelector('[name=quantity]');
-  const as = c.querySelector('[name=asId]');
-  if (await attempt(() => post(`items/${el.dataset.id}/reserve`, { quantity: qty ? Number(qty.value) : 1, asId: as ? Number(as.value) : undefined }))) { toast('Réservé !'); reload(); }
+  const i = S.data.items.find((x) => x.id === Number(el.dataset.id));
+  if (i.gifts.available <= 1 && S.data.actors.length <= 1) {
+    if (await attempt(() => post(`items/${i.id}/reserve`, { quantity: 1 }))) { toast(`« ${i.title} » réservé`); reload(); }
+    return;
+  }
+  sheet(`<h3>🎁 ${esc(i.title)}</h3><form class="stack" data-f="reserve" data-id="${i.id}">
+    ${i.gifts.available > 1 ? `<label>Combien ?<select name="quantity">${Array.from({ length: i.gifts.available }, (_, k) => `<option>${k + 1}</option>`).join('')}</select></label>` : ''}${asSelect()}
+    <div class="row end"><button type="button" class="btn ghost" data-a="close-sheet">Annuler</button><button class="btn main">Je réserve</button></div></form>`);
 });
-on('click', 'participate', async (el) => {
-  const c = cardOf(el);
-  const as = c.querySelector('[name=asId]');
-  const amount = c.querySelector('[name=amount]').value;
-  if (await attempt(() => post(`items/${el.dataset.id}/participate`, { amount, asId: as ? Number(as.value) : undefined }))) { toast('Participation enregistrée'); reload(); }
+on('submit', 'reserve', async (form, f) => {
+  if (await attempt(() => post(`items/${form.dataset.id}/reserve`, { quantity: Number(f.quantity || 1), asId: f.asId ? Number(f.asId) : undefined }))) { closeSheet(); toast('Réservé !'); reload(); }
 });
+on('click', 'participate-sheet', (el) => {
+  const i = S.data.items.find((x) => x.id === Number(el.dataset.id));
+  const mine = i.gifts.reservations.find((r) => r.mine);
+  sheet(`<h3>💶 ${esc(i.title)}</h3><p class="small muted">Cadeau commun${i.price ? ` : ${eur(i.gifts.funded)} réunis sur ${eur(i.price)}` : ''}.</p>
+    <form class="stack" data-f="participate" data-id="${i.id}"><label>Ma participation (€)<input name="amount" inputmode="decimal" required value="${mine ? esc(eurInput(mine.amount)) : ''}"></label>${asSelect()}
+    <div class="row end"><button type="button" class="btn ghost" data-a="close-sheet">Annuler</button><button class="btn main">${mine ? 'Modifier ma part' : 'Participer'}</button></div></form>`);
+});
+on('submit', 'participate', async (form, f) => {
+  if (await attempt(() => post(`items/${form.dataset.id}/participate`, { amount: f.amount, asId: f.asId ? Number(f.asId) : undefined }))) { closeSheet(); toast('Participation enregistrée'); reload(); }
+});
+on('click', 'res-reassign-sheet', (el) => {
+  const r = S.data.items.flatMap((i) => (i.gifts ? i.gifts.reservations : [])).find((x) => x.id === Number(el.dataset.id));
+  sheet(`<h3>👤 Réattribuer la réservation</h3><form class="stack" data-f="reassign" data-id="${r.id}"><select name="giverId">${S.data.members.map((m) => `<option value="${m.id}" ${m.id === r.giverId ? 'selected' : ''}>${esc(m.name)}</option>`).join('')}</select>
+    <div class="row end"><button type="button" class="btn ghost" data-a="close-sheet">Annuler</button><button class="btn main">Réattribuer</button></div></form>`);
+});
+on('submit', 'reassign', async (form, f) => { if (await attempt(() => patch(`reservations/${form.dataset.id}`, { giverId: Number(f.giverId) }))) { closeSheet(); toast('Réservation réattribuée'); reload(); } });
 on('click', 'res-status', async (el) => { if (await attempt(() => patch(`reservations/${el.dataset.id}`, { status: el.dataset.v }))) reload(); });
 on('click', 'res-carrier', async (el) => { if (await attempt(() => patch(`reservations/${el.dataset.id}`, { carrier: true }))) reload(); });
 on('click', 'res-cancel', async (el) => {
   if (!(await confirmSheet({ title: 'Annuler la réservation ?', text: 'Le cadeau redeviendra disponible pour les autres.', ok: 'Annuler la réservation', danger: true }))) return;
   if (await attempt(() => del(`reservations/${el.dataset.id}`))) reload();
 });
-on('change', 'res-reassign', async (el) => { if (await attempt(() => patch(`reservations/${el.dataset.id}`, { giverId: Number(el.value) }))) { toast('Réservation réattribuée'); reload(); } });
-on('submit', 'comment', async (form, f) => { if (await attempt(() => post(`items/${form.dataset.id}/comments`, { body: f.body }))) { S.q.openThread = form.dataset.id; reload(); } });
+on('submit', 'comment', async (form, f) => { if (await attempt(() => post(`items/${form.dataset.id}/comments`, { body: f.body }))) reload(); });
 on('submit', 'offlist', async (form, f) => {
   if (await attempt(() => post(`lists/${listId()}/off-list`, { description: f.description, asId: f.asId ? Number(f.asId) : undefined }))) { toast('Noté : les autres offrants le verront'); reload(); }
 });
 on('click', 'offlist-del', async (el) => { if (await attempt(() => del(`off-list/${el.dataset.id}`))) reload(); });
-on('click', 'item-received', async (el) => { if (await attempt(() => patch(`items/${el.dataset.id}/received`, { received: !!el.dataset.v }))) reload(); });
+on('click', 'item-menu', (el) => {
+  const id = Number(el.dataset.id);
+  const i = S.data.items.find((x) => x.id === id);
+  const ids = S.data.items.map((x) => x.id);
+  const k = ids.indexOf(id);
+  sheet(`<h3>${esc(i.title)}</h3><div class="stack">
+    <a class="btn ghost" href="#/listes/${S.data.list.id}/article/${id}" data-a="close-then-go" data-to="#/listes/${S.data.list.id}/article/${id}">✏️ Modifier</a>
+    <button class="btn ghost" data-a="item-received" data-id="${id}" data-v="${i.received ? '' : '1'}">${i.received ? '↩️ Pas encore reçu' : '🎉 Marquer comme reçu'}</button>
+    <div class="row"><button class="btn ghost grow" data-a="item-move" data-id="${id}" data-dir="-1" ${k === 0 ? 'disabled' : ''}>↑ Monter</button><button class="btn ghost grow" data-a="item-move" data-id="${id}" data-dir="1" ${k === ids.length - 1 ? 'disabled' : ''}>↓ Descendre</button></div>
+    <button class="btn danger-t" data-a="item-del" data-id="${id}" data-title="${esc(i.title)}">🗑️ Supprimer</button></div>`);
+});
+on('click', 'close-then-go', (el) => { closeSheet(); go(el.dataset.to); });
+on('click', 'item-received', async (el) => {
+  closeSheet(); if (await attempt(() => patch(`items/${el.dataset.id}/received`, { received: !!el.dataset.v }))) reload(); });
 on('click', 'item-del', async (el) => {
+  closeSheet();
   if (!(await confirmSheet({ title: 'Supprimer l’article ?', text: `« ${esc(el.dataset.title)} » sera retiré de la liste.`, ok: 'Supprimer', danger: true }))) return;
   if (await attempt(() => del(`items/${el.dataset.id}`))) { toast('Article supprimé'); reload(); }
 });
@@ -215,6 +262,7 @@ on('click', 'item-del', async (el) => {
 // Ordre : fleches, ou glisser-deposer a la souris.
 async function saveOrder(ids) { if (await attempt(() => put(`lists/${listId()}/items/order`, { ids }))) reload(); }
 on('click', 'item-move', (el) => {
+  closeSheet();
   const ids = S.data.items.map((i) => i.id);
   const k = ids.indexOf(Number(el.dataset.id));
   const j = k + Number(el.dataset.dir);
@@ -236,6 +284,22 @@ document.addEventListener('drop', (e) => {
 });
 document.addEventListener('dragend', () => { dragged = null; document.querySelectorAll('.item.over').forEach((x) => x.classList.remove('over')); });
 
+// ---------- Partage depuis le telephone : choisir la liste ----------
+define('ajouter', {
+  load: () => get('lists'),
+  view: (lists) => {
+    const mine = lists.filter((l) => l.role !== 'viewer');
+    const sh = S.q.shared;
+    return {
+      title: 'Ajouter à quelle liste ?', back: '#/', tab: 'listes',
+      body: `<div class="stack-lg">${sh ? `<p class="notice info">🔗 ${esc(sh.title || host(sh.url))}</p>` : ''}
+        ${mine.length ? mine.map((l) => `<a class="card lc" href="#/listes/${l.id}/article/nouveau"><span class="cover">${esc(l.cover)}</span><span class="grow"><b class="nm">${esc(l.title)}</b><span class="meta">${esc(l.owner.name)}</span></span>→</a>`).join('')
+          : empty('Crée d’abord une liste.')}</div>`,
+      fab: { href: '#/listes/nouvelle', label: 'Liste' },
+    };
+  },
+});
+
 // ---------- Fiche article ----------
 define('listes/:id/article/:itemId', {
   load: async (p) => {
@@ -246,7 +310,12 @@ define('listes/:id/article/:itemId', {
     return { list: v.list, categories: v.categories, item };
   },
   view: (d) => {
-    const it = d.item || {};
+    const sh = !d.item && S.q.shared;
+    const it = d.item || (sh ? { url: sh.url, title: sh.title } : {});
+    if (sh) {
+      S.q.shared = null;
+      setTimeout(() => { const b = document.querySelector('[data-a=prefill]'); if (b) b.click(); }, 50);
+    }
     return {
       title: d.item ? 'Modifier l’article' : 'Nouvel article', back: `#/listes/${d.list.id}`, tab: 'listes',
       body: `<form class="stack-lg" data-f="item" data-id="${d.item ? d.item.id : ''}"><div class="card stack">

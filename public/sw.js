@@ -2,11 +2,11 @@
 // (/hotte/ dans la passerelle). L'API n'est jamais mise en cache (donnees toujours
 // fraiches : une reservation doit etre vue tout de suite par les autres offrants).
 // Changer VERSION quand la liste des fichiers change.
-const VERSION = 'hotte-v3';
+const VERSION = 'hotte-v5';
 const FILES = [
   './', 'style.css', 'manifest.json', 'icon.svg',
   'app/main.js', 'app/ui.js', 'app/api.js', 'app/state.js', 'app/router.js', 'app/cards.js', 'app/connexion.js',
-  'app/install.js', 'app/accueil.js', 'app/listes.js', 'app/evenements.js', 'app/cercle.js', 'app/idees.js', 'app/cadeaux.js',
+  'app/install.js', 'app/accueil.js', 'app/listes.js', 'app/evenements.js', 'app/cercle.js', 'app/idees.js', 'app/cadeaux.js', 'app/recherche.js', 'app/journal.js',
 ];
 
 self.addEventListener('install', (e) => {

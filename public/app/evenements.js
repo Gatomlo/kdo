@@ -1,7 +1,7 @@
 // Evenements : liste, creation / modification, page d'un evenement (« qui a deja de
 // quoi », listes rattachees), organisation du Secret Santa, enveloppe et messages anonymes.
 import { esc, on, toast, confirmSheet, eur, eurInput, fmtDate, daysUntil, avatar, plural } from './ui.js';
-import { get, post, patch, del, attempt } from './api.js';
+import { get, post, patch, put, del, attempt } from './api.js';
 import { S, reload, go } from './state.js';
 import { define } from './router.js';
 import { listCard, eventRow, empty } from './cards.js';
@@ -11,7 +11,7 @@ define('evenements', {
   load: () => get('events'),
   view: (d) => ({
     title: 'Événements',
-    right: '<a class="btn main sm" href="#/evenements/nouveau">+ Nouveau</a>',
+    fab: { href: '#/evenements/nouveau', label: 'Événement' },
     body: `<div class="stack-lg"><section class="stack"><h2>À venir</h2>${d.upcoming.length ? d.upcoming.map(eventRow).join('') : empty('Aucun événement prévu. Noël approche…')}</section>
       ${d.past.length ? `<section class="stack"><h2>Passés</h2>${d.past.map(eventRow).join('')}</section>` : ''}</div>`,
   }),
@@ -47,7 +47,7 @@ define('evenements/:id/modifier', {
   load: async (p) => ({ ...(await get(`events/${p.id}/edit`)), members: (await get('circle')).members }),
   view: (d) => ({
     title: 'Modifier l’événement', back: `#/evenements/${d.event.id}`, tab: 'evenements',
-    body: eventForm('event-edit', d.event, d.members, d.participants, 'Enregistrer'),
+    body: `${eventForm('event-edit', d.event, d.members, d.participants, 'Enregistrer')}<button class="btn danger-t wide" data-a="event-del">Supprimer l’événement</button>`,
   }),
 });
 on('submit', 'event-edit', async (form, f) => {
@@ -74,11 +74,12 @@ define('evenements/:id', {
     } else if (d.isOrganizer) santa = '<button class="btn plum" data-a="santa-enable">🎅 Activer le Secret Santa</button>';
     return {
       title: ev.title, back: '#/evenements', tab: 'evenements',
+      settings: d.isOrganizer ? `#/evenements/${ev.id}/modifier` : null,
       body: `<div class="stack-lg">
         <header class="stack"><p class="muted">${ev.date ? `${fmtDate(ev.date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}${days != null && days >= 0 ? ` · ${days === 0 ? 'aujourd’hui !' : `dans ${plural(days, 'jour')}`}` : ''}` : 'Date à fixer'}
           ${ev.place ? `<br>📍 ${esc(ev.place)}` : ''}${ev.budget ? `<br>💶 Budget indicatif : ${eur(ev.budget)}` : ''}</p>
           ${d.organizer ? `<p class="small muted">Organisé par ${esc(d.organizer)}</p>` : ''}
-          ${d.isOrganizer ? `<div class="row wrap"><a class="btn ghost sm" href="#/evenements/${ev.id}/modifier">Modifier</a><button class="btn danger-t sm" data-a="event-del">Supprimer</button></div>` : ''}</header>
+</header>
         ${santa}
         <section class="stack"><h2>Qui a déjà de quoi ?</h2><p class="small muted">Cadeaux réservés par destinataire (tes propres cadeaux ne sont jamais comptés).</p>
           <div class="people">${d.coverage.length ? d.coverage.map((c) => `<div class="card row">${avatar(c, 'sm')}<span class="grow"><b>${esc(c.name)}</b><span class="meta">${c.lists ? plural(c.gifts, 'cadeau', 'cadeaux') : 'pas de liste'}</span></span></div>`).join('') : empty('Aucun autre participant.')}</div></section>
@@ -121,6 +122,8 @@ define('evenements/:id/secret-santa', {
             <ul class="small">${d.opened.map((o) => `<li>${esc(o.name)} — ${o.opened ? '✉️ ouverte' : 'pas encore ouverte'}</li>`).join('')}</ul>`
             : `<p class="muted">${plural(d.members.length, 'participant')}. Chacun recevra une autre personne, jamais lui-même, en respectant les exclusions.</p>`}
           <button class="btn plum wide" data-a="santa-draw">${s.status === 'drawn' ? 'Relancer le tirage' : 'Lancer le tirage au sort'}</button></section>
+        ${d.revealed ? `<section class="card stack"><h2>🎁 Les duos (dévoilés)</h2><ul class="small">${d.revealed.map((p) => `<li>${esc(p.giver)} → ${esc(p.receiver)}</li>`).join('')}</ul></section>`
+          : d.canReveal ? '<section class="card stack"><h2>Après la fête</h2><p class="small muted">Dévoile à tous les participants qui offrait à qui.</p><button class="btn plum" data-a="santa-reveal">Dévoiler les duos</button></section>' : ''}
         <button class="btn danger-t" data-a="santa-disable">Désactiver le Secret Santa</button>
       </div>`,
     };
@@ -135,6 +138,10 @@ on('click', 'santa-draw', async () => {
   if (opened && !(await confirmSheet({ title: 'Refaire le tirage ?', text: 'Des enveloppes ont déjà été ouvertes. Toutes les attributions changeront et tous les participants seront prévenus.', ok: 'Refaire le tirage', danger: true }))) return;
   const r = await attempt(() => post(`events/${evId()}/santa/draw`, { force: opened }));
   if (r) { toast(r.redraw ? 'Nouveau tirage effectué' : 'Tirage effectué : les enveloppes sont prêtes !'); reload(); }
+});
+on('click', 'santa-reveal', async () => {
+  if (!(await confirmSheet({ title: 'Dévoiler les duos ?', text: 'Tous les participants verront qui offrait à qui. C’est définitif.', ok: 'Dévoiler' }))) return;
+  if (await attempt(() => post(`events/${evId()}/santa/reveal`))) { toast('Duos dévoilés'); reload(); }
 });
 on('click', 'santa-disable', async () => {
   if (!(await confirmSheet({ title: 'Désactiver le Secret Santa ?', text: 'Les attributions et les messages seront perdus.', ok: 'Désactiver', danger: true }))) return;
@@ -156,6 +163,7 @@ define('evenements/:id/enveloppe', {
       return `<section class="card stack reveal">${head}<p class="muted">${e.forName ? `${esc(e.forName)} offre` : 'Tu offres'} un cadeau à</p>
         <div class="row">${avatar(e.receiver, 'lg')}<b class="target">${esc(e.receiver.name)}</b></div>
         ${d.draw && (d.draw.budget || d.draw.deadline) ? `<p class="small">${d.draw.budget ? `Budget ${eur(d.draw.budget)}` : ''}${d.draw.deadline ? ` · avant le ${fmtDate(d.draw.deadline)}` : ''}</p>` : ''}
+        ${e.hints && e.hints.length ? `<div class="hints"><p class="tag">Ses idées pour toi</p><ul>${e.hints.map((h) => `<li>${esc(h)}</li>`).join('')}</ul></div>` : ''}
         ${e.lists.length ? `<div class="stack tight">${e.lists.map((l) => `<a class="card row" href="#/listes/${l.id}"><span class="cover">${esc(l.cover)}</span><b class="grow">${esc(l.title)}</b>→</a>`).join('')}</div>` : `<p class="small muted">${esc(e.receiver.name)} n’a pas encore de liste.</p>`}
         <details ${e.messages.length ? 'open' : ''}><summary>✉️ Poser une question anonyme</summary><div class="stack tight">
           ${thread(e.messages, 'question')}
@@ -166,10 +174,18 @@ define('evenements/:id/enveloppe', {
       <form class="row" data-f="santa-msg" data-id="${r.pairId}" data-dir="reply"><input name="body" maxlength="1000" placeholder="Ta réponse" required class="grow"><button class="btn sm">Répondre</button></form></section>`).join('');
     return {
       title: 'Secret Santa', sub: d.event.title, back: `#/evenements/${d.event.id}`, tab: 'evenements',
-      body: `<div class="stack-lg">${d.draw && d.draw.status === 'drawn' ? '' : '<p class="banner info">🎅 <span>Le tirage n’a pas encore eu lieu.</span></p>'}
-        ${env || (d.draw && d.draw.status === 'drawn' ? empty('Tu ne participes pas à ce tirage.') : '')}${received}</div>`,
+      body: `<div class="stack-lg">${d.draw && d.draw.status === 'drawn' ? '' : '<p class="notice info">🎅 Le tirage n’a pas encore eu lieu.</p>'}
+        ${d.revealed ? `<section class="card stack"><h2>🎁 Qui offrait à qui</h2><ul class="small">${d.revealed.map((p) => `<li>${esc(p.giver)} → ${esc(p.receiver)}</li>`).join('')}</ul></section>` : ''}
+        ${env || (d.draw && d.draw.status === 'drawn' ? empty('Tu ne participes pas à ce tirage.') : '')}${received}
+        ${d.myHints.map((h) => `<details class="fiche" ${h.hints.length ? '' : 'open'}><summary>💡 ${h.name ? `Les idées de ${esc(h.name)}` : 'Mes idées'} pour ${h.name ? 'son' : 'mon'} Secret Santa${h.hints.length ? ` (${h.hints.length})` : ''}</summary><form class="stack tight" data-f="santa-hints" data-mid="${h.memberId}">
+          <p class="small muted">Pas de liste ? Donne jusqu’à 3 idées : ${h.name ? 'son' : 'ton'} Secret Santa les verra en ouvrant son enveloppe, sans que tu saches qui c’est.</p>
+          ${[0, 1, 2].map((k) => `<input name="h${k}" maxlength="200" value="${esc(h.hints[k] || '')}" placeholder="${['Un livre de cuisine', 'Du thé vert', 'Des chaussettes rigolotes'][k]}">`).join('')}
+          <button class="btn">Enregistrer</button></form></details>`).join('')}</div>`,
     };
   },
+});
+on('submit', 'santa-hints', async (form, f) => {
+  if (await attempt(() => put(`events/${S.data.event.id}/santa/hints/${form.dataset.mid}`, { hints: [f.h0, f.h1, f.h2] }))) toast('Idées enregistrées');
 });
 on('click', 'env-open', async (el) => {
   el.classList.add('opening');
