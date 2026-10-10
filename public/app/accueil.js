@@ -1,5 +1,5 @@
 // Tableau de bord : mon Secret Santa, evenements a venir, mes reservations, la famille.
-import { esc, eur, plural } from './ui.js';
+import { esc, eur, plural, avatar, fmtDate } from './ui.js';
 import { get } from './api.js';
 import { S } from './state.js';
 import { define } from './router.js';
@@ -18,6 +18,8 @@ define('', {
           <span class="grow"><b>${esc(r.title)}</b><span class="meta">pour ${esc(r.ownerName)} · ${esc(r.listTitle)}${r.amount != null ? ` · ma part ${eur(r.amount)}${r.isCarrier ? ' (porteur)' : ''}` : r.quantity > 1 ? ` · × ${r.quantity}` : ''}</span></span>
           <span class="pill ${r.status === 'bought' ? 'p-buy' : 'p-res'}">${r.status === 'bought' ? 'acheté' : 'à acheter'}</span></a>`).join('')}`
       : empty('Tu n’as encore rien réservé. Va voir les listes de la famille !');
+    const bdays = d.birthdays.map((b) => `<div class="card row">${avatar(b, 'sm')}<span class="grow"><b>${b.id === S.me.id ? 'Ton anniversaire' : esc(b.name)}</b><span class="meta">${fmtDate(b.date, { weekday: 'long', day: 'numeric', month: 'long' })}${b.age ? ` · ${b.age} ans` : ''}</span></span>
+      <span class="pill ${b.days <= 7 ? 'p-hide' : 'p-mgr'}">${b.days === 0 ? 'aujourd’hui 🎉' : b.days === 1 ? 'demain' : `dans ${b.days} j`}</span>${b.id !== S.me.id ? `<a class="btn ghost sm" href="#/idees/${b.id}" aria-label="Idées pour ${esc(b.name)}">💡</a>` : ''}</div>`).join('');
     const family = d.lists.filter((l) => l.role === 'viewer');
     const mine = d.lists.filter((l) => l.role !== 'viewer');
     return {
@@ -28,7 +30,8 @@ define('', {
         ${envelopes ? `<section class="stack">${envelopes}</section>` : ''}
         <section class="stack"><div class="between"><h2>Événements à venir</h2><a class="link" href="#/evenements">Tout voir</a></div>
           ${d.events.length ? d.events.map(eventRow).join('') : empty('Aucun événement prévu. <a href="#/evenements/nouveau">En créer un</a>')}</section>
-        <section class="stack"><div class="between"><h2>Mes réservations</h2>${todo.length ? `<span class="muted small">${plural(todo.length, 'cadeau')} à acheter</span>` : ''}</div>${reservations}</section>
+        ${bdays ? `<section class="stack"><h2>🎂 Anniversaires à venir</h2>${bdays}</section>` : ''}
+        <section class="stack"><div class="between"><h2>Mes réservations</h2><a class="link" href="#/mes-cadeaux">${todo.length ? `${plural(todo.length, 'cadeau', 'cadeaux')} à acheter · ` : ''}Budget et historique</a></div>${reservations}</section>
         <section class="stack"><div class="between"><h2>La famille</h2><a class="link" href="#/listes">Toutes les listes</a></div>
           ${family.length ? family.map(listCard).join('') : empty('Personne n’a encore publié de liste.')}</section>
         <section class="stack"><div class="between"><h2>Mes listes</h2><a class="link" href="#/listes/nouvelle">+ Nouvelle</a></div>

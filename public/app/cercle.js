@@ -1,9 +1,17 @@
 // Cercle familial (membres, profils sans compte, invitations) et Mon compte.
-import { esc, on, toast, sheet, closeSheet, confirmSheet, avatar } from './ui.js';
+import { esc, on, toast, sheet, closeSheet, confirmSheet, avatar, fmtDate } from './ui.js';
 import { get, post, patch, put, del, attempt } from './api.js';
 import { S, reload } from './state.js';
 import { define } from './router.js';
 import { empty } from './cards.js';
+
+// Ligne « anniversaire · idees » sous le nom d'un membre.
+function extras(m, ideas) {
+  const bd = m.birthDate ? `🎂 ${fmtDate(`2000${m.birthDate.slice(4)}`, { day: 'numeric', month: 'long' })}${m.birthdayLeadDays ? ` · liste ${m.birthdayLeadDays} j avant` : ''}` : '';
+  const birthday = m.canEditBirthday ? `<button class="linkbtn" data-a="birthday" data-id="${m.id}">${bd || '🎂 Ajouter l’anniversaire'}</button>` : bd ? `<span>${bd}</span>` : '';
+  const idea = m.me ? '' : `<a href="#/idees/${m.id}">💡 Idées${ideas[m.id] ? ` (${ideas[m.id]})` : ''}</a>`;
+  return birthday || idea ? `<span class="meta">${birthday}${idea}</span>` : '';
+}
 
 const linkSheet = (title, url, text) => sheet(`<h3>${esc(title)}</h3><p class="muted small">${text}</p>
   <input readonly value="${esc(url)}" class="select-all"><div class="row end"><button class="btn ghost" data-a="close-sheet">Fermer</button><button class="btn main" data-a="copy" data-text="${esc(url)}">Copier le lien</button></div>`);
@@ -21,12 +29,12 @@ define('cercle', {
       body: `<div class="stack-lg">
         <section class="stack"><div class="between"><h2>Membres (${accounts.length})</h2>${admin ? '<button class="btn main sm" data-a="invite">+ Inviter</button>' : ''}</div>
           ${accounts.map((m) => `<div class="card row">${avatar(m)}<span class="grow"><b>${esc(m.name)}</b>${m.me ? ' <span class="muted small">(moi)</span>' : ''}${m.isAdmin ? ' <span class="pill p-mgr">admin</span>' : ''}
-            ${m.email ? `<span class="meta">${esc(m.email)}</span>` : ''}</span>
+            ${m.email ? `<span class="meta">${esc(m.email)}</span>` : ''}${extras(m, d.ideas)}</span>
             ${admin && !m.me ? `<button class="btn ghost sm" data-a="member-menu" data-id="${m.id}">Gérer</button>` : ''}</div>`).join('')}</section>
         <section class="stack"><div class="between"><h2>Profils sans compte (${profiles.length})</h2><button class="btn plum sm" data-a="profile-new">+ Profil</button></div>
           <p class="small muted">Enfants, aînés sans e-mail… Leurs listes sont pilotées par leurs gestionnaires, qui voient et gèrent les réservations.</p>
           ${profiles.length ? profiles.map((p) => `<div class="card row">${avatar(p)}<span class="grow"><b>${esc(p.name)}</b>${p.iManage ? ' <span class="pill p-mgr">je gère</span>' : ''}
-            <span class="meta">Gestion : ${p.managers.map((id) => esc((byId.get(id) || {}).name || '?')).join(', ')}</span></span>
+            <span class="meta">Gestion : ${p.managers.map((id) => esc((byId.get(id) || {}).name || '?')).join(', ')}</span>${extras(p, d.ideas)}</span>
             ${p.iManage || admin ? `<button class="btn ghost sm" data-a="profile-menu" data-id="${p.id}">Gérer</button>` : ''}</div>`).join('') : empty('Aucun profil sans compte.')}</section>
         ${admin && d.guests.length ? `<section class="stack"><h2>Invités hors cercle (${d.guests.length})</h2>
           <p class="small muted">Venus par le lien de partage d’une liste ; ils ne voient que cette liste.</p>
@@ -100,6 +108,33 @@ on('click', 'profile-account', async (el) => {
   if (r) linkSheet('Lien de création de compte', r.url, 'Avec ce lien, la personne choisit son e-mail et son mot de passe ; elle garde ses listes. Ses gestionnaires redeviennent de simples offrants.');
 });
 
+// ---------- Anniversaire (soi, profils geres, ou admin) ----------
+// Delai reglable par personne : combien de jours avant l'anniversaire la liste et
+// l'evenement sont crees automatiquement.
+function birthdaySheet(m) {
+  const known = m.birthDate && !m.birthDate.startsWith('0000');
+  const who = m.me ? 'tu es prévenu·e' : m.hasAccount ? `${esc(m.name)} est prévenu·e` : 'ses gestionnaires sont prévenus';
+  sheet(`<h3>🎂 Anniversaire ${m.me ? '' : `de ${esc(m.name)}`}</h3><form class="stack" data-f="birthday" data-id="${m.id}">
+    <div class="grid2"><label>Jour et mois<input name="md" type="text" inputmode="numeric" placeholder="JJ/MM" required value="${m.birthDate ? `${m.birthDate.slice(8)}/${m.birthDate.slice(5, 7)}` : ''}"></label>
+      <label>Année <span class="muted">(facultatif, pour l’âge)</span><input name="year" type="number" min="1900" max="2100" value="${known ? m.birthDate.slice(0, 4) : ''}"></label></div>
+    <label class="check"><input type="checkbox" name="auto" data-ch="bd-auto" ${m.birthdayLeadDays ? 'checked' : ''}> Créer automatiquement la liste et l’événement</label>
+    <label id="bd-lead" ${m.birthdayLeadDays ? '' : 'hidden'}>Combien de jours avant l’anniversaire ?<input name="lead" type="number" min="1" max="180" value="${m.birthdayLeadDays || 30}"></label>
+    <p class="small muted">La liste « Anniversaire de ${esc(m.name)} » et l’événement (toute la famille invitée) sont créés ce nombre de jours avant ; ${who} pour la remplir.</p>
+    <div class="row end">${m.birthDate ? '<button type="button" class="btn danger-t" data-a="birthday-clear">Effacer</button>' : ''}<button type="button" class="btn ghost" data-a="close-sheet">Annuler</button><button class="btn main">Enregistrer</button></div></form>`);
+}
+on('click', 'birthday', (el) => birthdaySheet(member(el.dataset.id)));
+on('change', 'bd-auto', (el) => { document.getElementById('bd-lead').hidden = !el.checked; });
+const saveBirthday = async (id, body) => {
+  if (await attempt(() => put(`circle/members/${id}/birthday`, body))) { closeSheet(); toast('Anniversaire enregistré'); reload(); }
+};
+on('submit', 'birthday', (form, f) => {
+  const m = String(f.md).trim().match(/^(\d{1,2})[/.-](\d{1,2})$/);
+  if (!m) { toast('Indique le jour et le mois (JJ/MM).', true); return; }
+  const md = `${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+  saveBirthday(form.dataset.id, { birthDate: f.year ? `${f.year}-${md}` : md, leadDays: f.auto ? Number(f.lead) : null });
+});
+on('click', 'birthday-clear', () => saveBirthday(document.querySelector('form[data-f=birthday]').dataset.id, { birthDate: '', leadDays: null }));
+
 // ---------- Reglages de l'app (administrateur) ----------
 define('reglages', {
   load: () => get('settings'),
@@ -148,7 +183,10 @@ on('submit', 'settings-url', async (form, f) => { if (await attempt(() => put('s
 
 // ---------- Mon compte ----------
 define('moi', {
-  load: async () => ({ me: await get('me'), palette: (await get('circle')).palette }),
+  load: async () => {
+    const [me, circle, pushInfo] = await Promise.all([get('me'), get('circle'), get('push')]);
+    return { me, palette: circle.palette, members: circle.members, self: circle.members.find((m) => m.me), push: pushInfo };
+  },
   view: (d) => ({
     title: 'Mon compte', back: '#/', tab: '',
     body: `<div class="stack-lg">
@@ -161,14 +199,54 @@ define('moi', {
         <label>Nouveau mot de passe (8 caractères minimum)<input type="password" name="password" autocomplete="new-password" minlength="8" required></label>
         <label>Confirmer<input type="password" name="password2" autocomplete="new-password" minlength="8" required></label>
         <button class="btn">Enregistrer</button></form>
+      <section class="card stack"><h2>🎂 Mon anniversaire</h2>
+        <p class="small muted">${d.self.birthDate ? `${fmtDate(`2000${d.self.birthDate.slice(4)}`, { day: 'numeric', month: 'long' })}${d.self.birthdayLeadDays ? ` · ta liste est créée ${d.self.birthdayLeadDays} jours avant` : ' · pas de liste automatique'}` : 'Pas encore renseigné.'}</p>
+        <button class="btn ghost" data-a="birthday" data-id="${d.self.id}">${d.self.birthDate ? 'Modifier' : 'Ajouter mon anniversaire'}</button></section>
+      ${pushSection(d.push)}
       ${d.me.profiles.length ? `<section class="card stack"><h2>Profils que je gère</h2>${d.me.profiles.map((p) => `<div class="row">${avatar(p, 'sm')}<span class="grow">${esc(p.name)}</span><a class="link" href="#/listes/nouvelle">+ liste</a></div>`).join('')}</section>` : ''}
-      <section class="stack"><a class="btn ghost" href="api/export" download>⬇️ Exporter les données (JSON)</a>
+      <section class="stack"><a class="btn ghost" href="#/mes-cadeaux">🎁 Mes cadeaux : budget et historique</a>
+        <a class="btn ghost" href="api/export" download>⬇️ Exporter les données (JSON)</a>
         <p class="small muted">Sans les cadeaux de tes propres listes : pas de spoiler, même dans l’export.</p>
         <button class="btn ghost" data-a="theme">◐ Mode clair / sombre</button>
         <button class="btn danger-t" data-a="logout">Se déconnecter</button></section>
     </div>`,
   }),
 });
+// ---------- Notifications sur cet appareil (Web Push) ----------
+const pushSupported = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+function pushSection(info) {
+  let body;
+  if (!pushSupported()) {
+    body = '<p class="small muted">Ce navigateur ne gère pas les notifications. Sur iPhone : installe d’abord l’app sur l’écran d’accueil (iOS 16.4 ou plus récent), puis ouvre-la depuis son icône.</p>';
+  } else if (Notification.permission === 'denied') {
+    body = '<p class="small muted">Notifications refusées pour ce site : autorise-les dans les réglages du navigateur.</p>';
+  } else {
+    body = `<p class="small muted">Reçois sur ce téléphone ou cet ordinateur : enveloppe Secret Santa, article réservé modifié, anniversaire qui approche, question de ton Secret Santa…${info.devices ? ` <b>${info.devices} appareil${info.devices > 1 ? 's' : ''} abonné${info.devices > 1 ? 's' : ''}.</b>` : ''}</p>
+      <div class="row wrap"><button class="btn main" data-a="push-on">🔔 Activer sur cet appareil</button>${info.devices ? '<button class="btn ghost" data-a="push-test">Essayer</button><button class="btn ghost" data-a="push-off">Désactiver ici</button>' : ''}</div>`;
+  }
+  return `<section class="card stack"><h2>🔔 Notifications</h2>${body}</section>`;
+}
+const b64ToBytes = (b64) => {
+  const s = atob((b64 + '='.repeat((4 - (b64.length % 4)) % 4)).replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from(s, (c) => c.charCodeAt(0));
+};
+on('click', 'push-on', async () => {
+  if (await Notification.requestPermission() !== 'granted') { toast('Notifications non autorisées.', true); return; }
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const sub = (await reg.pushManager.getSubscription()) || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(S.data.push.publicKey) });
+    if (await attempt(() => post('push/subscribe', { subscription: sub.toJSON() }))) { toast('Notifications activées sur cet appareil'); reload(); }
+  } catch (e) { toast(`Activation impossible : ${e.message}`, true); }
+});
+on('click', 'push-off', async () => {
+  const reg = await navigator.serviceWorker.ready;
+  const sub = await reg.pushManager.getSubscription();
+  if (sub) { await attempt(() => post('push/unsubscribe', { endpoint: sub.endpoint })); await sub.unsubscribe().catch(() => {}); }
+  toast('Notifications désactivées ici');
+  reload();
+});
+on('click', 'push-test', async () => { if (await attempt(() => post('push/test'))) toast('Notification envoyée'); });
+
 on('submit', 'me', async (form, f) => {
   const me = await attempt(() => patch('me', { name: f.name, color: f.color }));
   if (me) { S.me = me; toast('Enregistré'); reload(); }

@@ -4,16 +4,16 @@
 Outil familial privé : listes de souhaits par catégories, réservation des cadeaux cachée au destinataire, événements familiaux avec tirage Secret Santa secret. Spécifications : `CAHIER_DES_CHARGES.md`. Maquette d'origine : `maquette/index.html`.
 
 ## État (au 2026-10-10)
-Étapes 1 à 5 du cahier codées : y compris partage hors cercle (lien + mot de passe facultatif), dépôt de photos, réglages e-mail dans l'app. Pas encore déployé.
+Étapes 1 à 5 du cahier codées, plus §4.8 (idées secrètes, notifications push, anniversaires automatiques, reçu/report, budget et historique, duplication). Pas encore déployé.
 
 ## Stack
-Même socle que Le Cabas (`../listes-courses`, s'en inspirer) et MyLittleLibraryV2 : Node ≥ 22.5, Express 4, `node:sqlite` (base unique `data/hotte.db`), nodemailer. Front : SPA en modules ES sans framework ni build (`public/app/`), navigation par `#/…`, CSP stricte.
+Même socle que Le Cabas (`../listes-courses`, s'en inspirer) et MyLittleLibraryV2 : Node ≥ 22.5, Express 4, `node:sqlite` (base unique `data/hotte.db`), nodemailer, web-push (JS pur). Front : SPA en modules ES sans framework ni build (`public/app/`), navigation par `#/…`, CSP stricte.
 
 ## Fichiers clés
 - `server.js` : exporte `app` (listen seulement si lancé directement), page `index.html` avec `{{ROOT}}` → `<base href>`, API sur `/api`.
 - `lib/db.js` : connexion, `tx` (imbriquable), `inList` (ids entiers pour `IN`), `MIGRATIONS` (`PRAGMA user_version` ; ne jamais modifier une entrée déployée).
-- `lib/access.js` : **rôles et anti-spoiler** (`roleOn`, `listAccess`, `requireGiver`, `actorIds`, `hiddenListIds`). `lib/lists.js` (listes, articles, réservations, participations, discussions, hors liste, `view` = vue filtrée). `lib/events.js` (événements, Secret Santa, enveloppes, messages). `lib/santa.js` (tirage pur, testé). `lib/circle.js` (membres, profils, invitations). `lib/auth.js` (copié du Cabas). `lib/notify.js`, `lib/mailer.js`, `lib/preview.js` (Open Graph, garde-fou SSRF), `lib/exporter.js`, `lib/share.js` (lien de partage, mot de passe, invités, `guestAllowed`), `lib/photos.js` (dépôt, vérification du type, nettoyage), `lib/api.js` (toutes les routes).
-- `public/app/` : `main.js` (cadre, routeur), `router.js` (`define(pattern, {load, view})`), `ui.js`, `api.js`, `state.js`, un fichier par domaine (`accueil`, `listes`, `evenements`, `cercle`, `connexion`, `install`), `cards.js`.
+- `lib/access.js` : **rôles et anti-spoiler** (`roleOn`, `listAccess`, `requireGiver`, `actorIds`, `hiddenListIds`). `lib/lists.js` (listes, articles, réservations, participations, discussions, hors liste, `view` = vue filtrée). `lib/events.js` (événements, Secret Santa, enveloppes, messages). `lib/santa.js` (tirage pur, testé). `lib/circle.js` (membres, profils, invitations). `lib/auth.js` (copié du Cabas). `lib/notify.js`, `lib/mailer.js`, `lib/preview.js` (Open Graph, garde-fou SSRF), `lib/exporter.js`, `lib/share.js` (lien de partage, mot de passe, invités, `guestAllowed`), `lib/photos.js` (dépôt, vérification du type, nettoyage), `lib/push.js` (Web Push, clés VAPID en base), `lib/ideas.js` (idées secrètes), `lib/birthdays.js` (anniversaires automatiques), `lib/gifts.js` (historique, budget), `lib/api.js` (toutes les routes).
+- `public/app/` : `main.js` (cadre, routeur), `router.js` (`define(pattern, {load, view})`), `ui.js`, `api.js`, `state.js`, un fichier par domaine (`accueil`, `listes`, `evenements`, `cercle` (+ Mon compte, réglages, anniversaire, push), `idees`, `cadeaux`, `connexion`, `install`), `cards.js`. `public/sw.js` : cache + réception des notifications (changer `VERSION` quand les fichiers changent).
 
 ## Règles non évidentes
 - **Anti-spoiler côté serveur** : `listAccess` teste propriétaire puis co-propriétaire avant gestionnaire (règle 3). `view()` ne charge réservations, commentaires et hors-liste que si `canSeeGifts`. Compteurs (`summaries`, « qui a déjà de quoi », export) passent par `hiddenListIds`. Personne ne change son propre rôle sur une liste.
@@ -26,6 +26,10 @@ Même socle que Le Cabas (`../listes-courses`, s'en inspirer) et MyLittleLibrary
 - **Invités hors cercle** : `members.guest_list_id` (+ `guest_email` facultatif), sans compte. Session valable tant que `lists.share_token` existe ; route permise seulement si `share.guestAllowed` (sa liste, actions d'offrant). Même prénom = même invité. Mot de passe de liste (`share_password_hash`) : le changer supprime les sessions des invités. Exclus partout ailleurs (`guest_list_id IS NULL` : cercle, événements, rôles, réattribution).
 - **Photos** : réduites par le navigateur (1200 px, JPEG), `POST /api/photos` en binaire (seule exception à `jsonOnly`), type vérifié par les octets, `data/photos/<32 hex>.jpg` servi sans connexion sur `/photos/…` ; `items.image` = `photos/…` ou lien http(s). Fichier non référencé depuis 24 h supprimé à chaque dépôt.
 - **Réglages** (table `meta` : `getSetting`/`setSetting`) : `smtp` et `public_url`, saisis par l'admin dans l'app (#/reglages). Priorité : variable d'environnement > réglage > défaut. Mot de passe SMTP jamais renvoyé à l'interface.
+- **Notifications** : `notify.deliver` envoie chaque message par e-mail (si configuré) ET push (`push.sendTo`). Abonnement par appareil (Mon compte) ; 404/410 = abonnement supprimé. `HOTTE_PUSH=log` en test.
+- **Idées secrètes** (`ideas`) : jamais lisibles ni comptées par le destinataire ; « je m'en occupe » = `taken_by`.
+- **Anniversaires** : `members.birth_date` (`0000-MM-JJ` si année inconnue) + `birthday_lead_days` **réglable par personne** (soi, gestionnaire du profil, admin ; NULL = pas d'automatique). `birthdays.run` (au fil des requêtes, ≤ 1×/h, et à l'enregistrement) crée liste + événement (toute la famille) une fois par an (`birthday_runs`).
+- **Après la fête** : `items.received_at` (marqué par ceux qui modifient la liste) ; `carry` copie les non-reçus vers une liste du même destinataire puis archive ; `duplicate` copie catégories, articles et rôles.
 - Prix en centimes. Dates `AAAA-MM-JJ`.
 
 ## Commandes

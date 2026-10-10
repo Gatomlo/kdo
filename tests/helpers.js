@@ -7,6 +7,7 @@ const path = require('path');
 process.env.HOTTE_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'hotte-test-'));
 process.env.HOTTE_MAIL = process.env.HOTTE_MAIL || 'log';
 process.env.HOTTE_QUIET = '1';
+process.env.HOTTE_PUSH = 'log';
 const app = require('../server');
 const { outbox } = require('../lib/mailer');
 

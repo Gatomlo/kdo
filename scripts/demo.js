@@ -65,6 +65,13 @@ async function seed() {
   const t1 = (await thomas('POST', `lists/${tList}/items`, { title: 'Casque audio', price: '120', priority: 3 })).id;
   await lea.c('POST', `items/${t1}/reserve`, {});
 
+  // Anniversaire de Lea dans 20 jours (liste creee 30 jours avant : tout de suite), idees secretes.
+  const soon = new Date(Date.now() + 20 * 86400000).toISOString().slice(5, 10);
+  await lea.c('PUT', `circle/members/${lea.id}/birthday`, { birthDate: `1992-${soon}`, leadDays: 30 });
+  await thomas('PUT', `circle/members/${leon}/birthday`, { birthDate: '2021-04-02', leadDays: 45 });
+  await marc.c('POST', `ideas/${lea.id}`, { title: 'Cours de poterie', price: '60', note: 'Elle en a parlé à Pâques' });
+  await mamy.c('POST', `ideas/${lea.id}`, { title: 'Abonnement à un magazine de jardinage' });
+
   await thomas('POST', `events/${ev}/santa`);
   await thomas('PATCH', `events/${ev}/santa`, { budget: '25', deadline: '2026-12-20', avoidPrevious: true });
   await thomas('POST', `events/${ev}/santa/exclusions`, { a: lea.id, b: marc.id });

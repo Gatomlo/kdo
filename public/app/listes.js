@@ -99,6 +99,7 @@ define('listes/:id', {
             ${d.event ? `<p class="small">Événement : ${d.guest ? esc(d.event.title) : `<a href="#/evenements/${d.event.id}">${esc(d.event.title)}</a>`}</p>` : ''}</div></div>
           ${list.welcome ? `<p class="card welcome">${esc(list.welcome)}</p>` : ''}
           ${banners}
+          ${d.role === 'viewer' && !d.guest ? `<a class="link" href="#/idees/${owner.id}">💡 Idées secrètes pour ${esc(owner.name)}</a>` : ''}
           ${d.canEdit ? `<div class="row wrap"><a class="btn main" href="#/listes/${list.id}/article/nouveau">+ Ajouter un article</a><a class="btn ghost" href="#/listes/${list.id}/reglages">Réglages</a></div>` : ''}
         </header>
         ${filters}
@@ -120,7 +121,7 @@ function itemCard(i, d, order) {
   return `<article class="item${g && g.status === 'bought' ? ' done' : ''}" data-item="${i.id}" ${d.canEdit ? 'draggable="true"' : ''}>
     <div class="thumb">${i.image ? `<button class="zoom" data-a="photo-zoom" data-src="${esc(i.image)}" data-title="${esc(i.title)}" aria-label="Agrandir la photo"><img src="${esc(i.image)}" alt="" loading="lazy" referrerpolicy="no-referrer"></button>` : '🎁'}</div>
     <div class="body">
-      <div class="between"><b class="title">${esc(i.title)}</b>${g ? `<span class="pill ${STATUS[g.status][1]}">${STATUS[g.status][0]}</span>` : ''}</div>
+      <div class="between"><b class="title">${esc(i.title)}</b>${i.received ? '<span class="pill p-free">reçu 🎉</span>' : g ? `<span class="pill ${STATUS[g.status][1]}">${STATUS[g.status][0]}</span>` : ''}</div>
       <div class="meta"><span class="stars" title="Priorité ${i.priority}/3">${stars(i.priority)}</span>
         ${i.price != null ? `<span class="price">${eur(i.price)}</span>` : ''}
         ${i.quantity > 1 ? `<span>${g ? `${g.taken} sur ${i.quantity} pris` : `× ${i.quantity}`}</span>` : ''}
@@ -131,7 +132,8 @@ function itemCard(i, d, order) {
         <a class="btn ghost sm" href="#/listes/${d.list.id}/article/${i.id}">Modifier</a>
         <button class="btn ghost sm" data-a="item-move" data-id="${i.id}" data-dir="-1" ${pos === 0 ? 'disabled' : ''} aria-label="Monter">↑</button>
         <button class="btn ghost sm" data-a="item-move" data-id="${i.id}" data-dir="1" ${pos === order.length - 1 ? 'disabled' : ''} aria-label="Descendre">↓</button>
-        <button class="btn danger-t sm" data-a="item-del" data-id="${i.id}" data-title="${esc(i.title)}">Supprimer</button></div>` : ''}
+        <button class="btn danger-t sm" data-a="item-del" data-id="${i.id}" data-title="${esc(i.title)}">Supprimer</button>
+        <button class="btn ghost sm" data-a="item-received" data-id="${i.id}" data-v="${i.received ? '' : '1'}">${i.received ? 'Pas reçu' : 'Reçu ✓'}</button></div>` : ''}
     </div></article>`;
 }
 
@@ -204,6 +206,7 @@ on('submit', 'offlist', async (form, f) => {
   if (await attempt(() => post(`lists/${listId()}/off-list`, { description: f.description, asId: f.asId ? Number(f.asId) : undefined }))) { toast('Noté : les autres offrants le verront'); reload(); }
 });
 on('click', 'offlist-del', async (el) => { if (await attempt(() => del(`off-list/${el.dataset.id}`))) reload(); });
+on('click', 'item-received', async (el) => { if (await attempt(() => patch(`items/${el.dataset.id}/received`, { received: !!el.dataset.v }))) reload(); });
 on('click', 'item-del', async (el) => {
   if (!(await confirmSheet({ title: 'Supprimer l’article ?', text: `« ${esc(el.dataset.title)} » sera retiré de la liste.`, ok: 'Supprimer', danger: true }))) return;
   if (await attempt(() => del(`items/${el.dataset.id}`))) { toast('Article supprimé'); reload(); }
@@ -337,9 +340,10 @@ on('click', 'item-save-again', () => {
 // ---------- Reglages ----------
 define('listes/:id/reglages', {
   load: async (p) => {
-    const [v, circle, events, share] = await Promise.all([get(`lists/${p.id}`), get('circle'), allEvents(), get(`lists/${p.id}/share`)]);
+    const [v, circle, events, share, lists] = await Promise.all([get(`lists/${p.id}`), get('circle'), allEvents(), get(`lists/${p.id}/share`), get('lists')]);
     if (!v.canEdit) throw new Error('Tu ne peux pas modifier cette liste.');
-    return { ...v, members: circle.members, events, share };
+    const siblings = lists.filter((l) => l.owner.id === v.owner.id && l.id !== v.list.id && l.role !== 'viewer');
+    return { ...v, members: circle.members, events, share, siblings };
   },
   view: (d) => {
     const taken = new Set([d.owner.id, S.me.id, ...d.roles.map((r) => r.id)]);
@@ -361,6 +365,13 @@ define('listes/:id/reglages', {
           <form class="row wrap" data-f="role-add"><select name="memberId" class="grow">${d.members.filter((m) => !taken.has(m.id)).map((m) => `<option value="${m.id}">${esc(m.name)}${m.hasAccount ? '' : ' (sans compte)'}</option>`).join('')}</select>
             <select name="role"><option value="co_owner">co-propriétaire</option><option value="manager">gestionnaire</option></select><button class="btn sm">Ajouter</button></form></section>
         ${shareSection(d)}
+        <section class="card stack"><h2>Après la fête</h2>
+          <p class="small muted">Marque les cadeaux reçus (bouton « Reçu ✓ » sur chaque article), puis reporte les autres dans une liste suivante : cette liste sera archivée, l’historique des cadeaux est gardé.</p>
+          <form class="stack tight" data-f="list-carry"><label>Reporter les articles non reçus vers
+            <select name="targetId" data-ch="carry-target"><option value="">une nouvelle liste…</option>${d.siblings.map((l) => `<option value="${l.id}">${esc(l.title)}</option>`).join('')}</select></label>
+            <input name="title" id="carry-title" maxlength="120" placeholder="Titre de la nouvelle liste" value="${esc(`Mes envies ${new Date().getFullYear() + 1}`)}">
+            <button class="btn">Reporter et archiver</button></form>
+          <button class="btn ghost" data-a="list-dup">📄 Dupliquer cette liste</button></section>
         <section class="row wrap"><button class="btn ghost" data-a="list-archive">${d.list.archived ? 'Réactiver la liste' : 'Archiver la liste'}</button>
           ${d.role !== 'co_owner' ? '<button class="btn danger" data-a="list-del">Supprimer la liste</button>' : ''}</section>
       </div>`,
@@ -402,6 +413,18 @@ on('click', 'guest-del', async (el) => {
   shareCall(() => del(`lists/${listId()}/share/guests/${el.dataset.id}`), 'Invité retiré');
 });
 document.addEventListener('focusin', (e) => { if (e.target.classList && e.target.classList.contains('select-all')) e.target.select(); });
+
+on('change', 'carry-target', (el) => { document.getElementById('carry-title').hidden = !!el.value; });
+on('submit', 'list-carry', async (form, f) => {
+  const n = S.data.items.filter((i) => !i.received).length;
+  if (!(await confirmSheet({ title: 'Reporter et archiver ?', text: `${n} article${n > 1 ? 's' : ''} non reçu${n > 1 ? 's' : ''} ser${n > 1 ? 'ont copiés' : 'a copié'} ; cette liste sera archivée.`, ok: 'Reporter' }))) return;
+  const r = await attempt(() => post(`lists/${listId()}/carry`, f.targetId ? { targetId: Number(f.targetId) } : { title: f.title }));
+  if (r) { toast(`${r.moved} article${r.moved > 1 ? 's' : ''} reporté${r.moved > 1 ? 's' : ''}`); go(`#/listes/${r.id}`); }
+});
+on('click', 'list-dup', async () => {
+  const r = await attempt(() => post(`lists/${listId()}/duplicate`, {}));
+  if (r) { toast('Liste dupliquée'); go(`#/listes/${r.id}/reglages`); }
+});
 
 on('submit', 'list-save', async (form, f) => { if (await attempt(() => patch(`lists/${listId()}`, { ...f, eventId: f.eventId || null }))) toast('Liste enregistrée'); });
 on('submit', 'cat-add', async (form, f) => { if (await attempt(() => post(`lists/${listId()}/categories`, { name: f.name }))) reload(); });

@@ -10,6 +10,8 @@ import './accueil.js';
 import './listes.js';
 import './evenements.js';
 import './cercle.js';
+import './idees.js';
+import './cadeaux.js';
 
 const app = document.getElementById('app');
 
