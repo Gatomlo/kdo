@@ -76,14 +76,19 @@ define('evenements/:id', {
       title: ev.title, back: '#/evenements', tab: 'evenements',
       settings: d.isOrganizer ? `#/evenements/${ev.id}/modifier` : null,
       body: `<div class="stack-lg">
-        <header class="stack"><p class="muted">${ev.date ? `${fmtDate(ev.date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}${days != null && days >= 0 ? ` · ${days === 0 ? 'aujourd’hui !' : `dans ${plural(days, 'jour')}`}` : ''}` : 'Date à fixer'}
-          ${ev.place ? `<br>📍 ${esc(ev.place)}` : ''}${ev.budget ? `<br>💶 Budget indicatif : ${eur(ev.budget)}` : ''}</p>
-          ${d.organizer ? `<p class="small muted">Organisé par ${esc(d.organizer)}</p>` : ''}
-</header>
+        <header class="hero-ev">
+          <span class="sub">${ev.date ? esc(fmtDate(ev.date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })) : 'Date à fixer'}${ev.place ? ` · 📍 ${esc(ev.place)}` : ''}</span>
+          <span class="stats3">
+            ${days != null && days >= 0 ? `<span><b>${days === 0 ? '🎉' : days}</b>${days === 0 ? 'aujourd’hui' : days > 1 ? 'jours' : 'jour'}</span>` : ''}
+            <span><b>${d.participants.length}</b>${d.participants.length > 1 ? 'participants' : 'participant'}</span>
+            ${ev.budget ? `<span><b>${eur(ev.budget)}</b>budget</span>` : `<span><b>${d.lists.length}</b>${d.lists.length > 1 ? 'listes' : 'liste'}</span>`}
+          </span>
+          ${d.organizer ? `<span class="sub">Organisé par ${esc(d.organizer)}</span>` : ''}
+        </header>
         ${santa}
         ${d.myListMissing ? `<p class="banner">📝 <span>Tu n’as pas encore de liste : la famille ne sait pas quoi t’offrir. <a href="#/listes/nouvelle/evenement/${ev.id}">Créer ma liste</a></span></p>` : ''}
         <section class="stack"><h2>Qui a déjà de quoi ?</h2><p class="small muted">Cadeaux réservés par destinataire (tes propres cadeaux ne sont jamais comptés). La barre aide à n’oublier personne.</p>
-          <div class="people">${d.coverage.length ? coverageRows(d.coverage, d.isParticipant || d.isOrganizer) : empty('Aucun autre participant.')}</div></section>
+          <div class="stack">${d.coverage.length ? coverageRows(d.coverage, d.isParticipant || d.isOrganizer) : empty('Aucun autre participant.')}</div></section>
         <section class="stack"><div class="between"><h2>Listes de l’événement</h2>${d.isParticipant ? `<a class="link" href="#/listes/nouvelle/evenement/${ev.id}">+ Ma liste</a>` : ''}</div>
           ${d.lists.length ? d.lists.map(listCard).join('') : empty('Aucune liste rattachée. Chacun peut y rattacher la sienne (création ou réglages de la liste).')}</section>
         <section class="stack"><h2>Participants (${d.participants.length})</h2><div class="row wrap">${d.participants.map((p) => `<span class="row small">${avatar(p, 'sm')}${esc(p.name)}</span>`).join('')}</div></section>
@@ -142,7 +147,7 @@ function coverageRows(cov, canNudge) {
     if (c.noList && canNudge) right = c.nudgedAt > today ? '<span class="pill p-free">rappel envoyé</span>' : `<button class="btn ghost sm" data-a="nudge" data-id="${c.id}" data-name="${esc(c.name)}">🔔 Lui rappeler</button>`;
     else if (uneven && c.lists && c.gifts === min) right = '<span class="pill p-hide">à gâter</span>';
     const meta = c.lists ? plural(c.gifts, 'cadeau', 'cadeaux') : c.noList ? 'pas encore de liste' : 'liste générale (pas rattachée)';
-    return `<div class="card stack tight"><div class="row">${avatar(c, 'sm')}<span class="grow"><b>${esc(c.name)}</b><span class="meta">${meta}</span></span>${right}</div>
+    return `<div class="card stack tight"><div class="row">${avatar(c)}<span class="grow"><b>${esc(c.name)}</b><span class="meta">${meta}</span></span>${right}</div>
       ${c.lists ? `<div class="gauge" role="meter" aria-valuemin="0" aria-valuemax="${max}" aria-valuenow="${c.gifts}" aria-label="Cadeaux pour ${esc(c.name)}"><i style="width:${(c.gifts / max) * 100}%"></i></div>` : ''}</div>`;
   }).join('');
 }

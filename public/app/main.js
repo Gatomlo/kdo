@@ -47,22 +47,33 @@ const NAV = [
   ['cercle', 'Cercle', '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.3-5.5 6.5-5.5s5.7 1.9 6.5 5.5M16 4.5a3.5 3.5 0 010 7M18 14.8c1.9.7 3 2.4 3.5 5.2"/>'],
 ];
 
+const CHEVRON = svg('<path d="M15 5l-7 7 7 7"/>');
+
 function shell(v) {
   const tab = v.tab ?? S.route[0] ?? '';
-  const nav = v.noNav || (S.me && S.me.guest) ? '' : `<nav class="tabs" aria-label="Navigation principale">${NAV.map(([k, t, svg]) => `<a href="#/${k}" ${tab === k ? 'aria-current="page"' : ''}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${svg}</svg><span>${t}</span></a>`).join('')}</nav>`;
+  const nonav = v.noNav || (S.me && S.me.guest);
+  // Bouton central « + » : l'ajout propre a l'ecran (article, evenement…), sinon un souhait.
+  const add = v.fab || { href: '#/ajouter', label: 'Souhait' };
+  const addBtn = add.href
+    ? `<a class="add" href="${esc(add.href)}" aria-label="Ajouter : ${esc(add.label)}" title="Ajouter : ${esc(add.label)}">${ICONS.plus}</a>`
+    : `<button class="add" data-a="${esc(add.action)}" aria-label="Ajouter : ${esc(add.label)}" title="Ajouter : ${esc(add.label)}">${ICONS.plus}</button>`;
+  const tabLink = ([k, t, d]) => `<a href="#/${k}" ${tab === k ? 'aria-current="page"' : ''} aria-label="${t}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg><span class="lbl">${t}</span></a>`;
+  const nav = nonav ? '' : `<nav class="tabs" aria-label="Navigation principale">${NAV.slice(0, 2).map(tabLink).join('')}${addBtn}${NAV.slice(2).map(tabLink).join('')}</nav>`;
   const me = !S.me || v.noNav ? '' : S.me.guest
     ? `<button class="icon" data-a="big-text" aria-label="Agrandir le texte" title="Agrandir le texte">Aa</button><span class="row small">${avatar(S.me, 'sm')}${esc(S.me.name)}</span><button class="btn ghost sm" data-a="logout">Ce n’est pas moi</button>`
     : `<a href="#/recherche" class="icon" aria-label="Rechercher" title="Rechercher">${ICONS.search}</a><a href="#/moi" class="me" aria-label="Mon compte">${avatar(S.me)}</a>`;
   // Reglages de l'ecran (liste, evenement, cercle) : icone dans l'en-tete.
   const gear = v.settings ? `<a href="${esc(v.settings)}" class="icon" aria-label="Réglages" title="Réglages">${ICONS.gear}</a>` : '';
-  // Bouton d'ajout flottant (au-dessus de la navigation sur telephone).
-  const fab = v.fab ? (v.fab.href
+  // Sans barre de navigation (invites) : bouton d'ajout flottant.
+  const fab = nonav && v.fab ? (v.fab.href
     ? `<a class="fab" href="${esc(v.fab.href)}">${ICONS.plus}<span>${esc(v.fab.label)}</span></a>`
     : `<button class="fab" data-a="${esc(v.fab.action)}">${ICONS.plus}<span>${esc(v.fab.label)}</span></button>`) : '';
-  app.className = 'shell' + (v.noNav || (S.me && S.me.guest) ? ' nonav' : '');
-  const header = v.noNav && !v.title ? '' : `<header class="top">${v.back ? `<a class="back" href="${esc(v.back)}" aria-label="Retour">‹</a>` : ''}
-      ${v.title ? `<h2>${esc(v.title)}${v.sub ? `<small>${esc(v.sub)}</small>` : ''}</h2>` : '<a class="brand" href="#/">K<i>do</i></a>'}
-      ${v.right || ''}${gear}${me}</header>`;
+  app.className = 'shell' + (nonav ? ' nonav' : '');
+  const today = new Date().toLocaleDateString('fr-BE', { weekday: 'long', day: 'numeric', month: 'long' });
+  const titleHtml = v.hello ? `<div class="hello"><small>${esc(today)}</small><h1>${esc(v.hello)}</h1></div>`
+    : v.title ? `<h2>${esc(v.title)}${v.sub ? `<small>${esc(v.sub)}</small>` : ''}</h2>` : '<a class="brand" href="#/">K<i>do</i></a>';
+  const header = v.noNav && !v.title ? '' : `<header class="top">${v.back ? `<a class="back" href="${esc(v.back)}" aria-label="Retour">${CHEVRON}</a>` : ''}
+      ${titleHtml}${v.right || ''}${gear}${me}</header>`;
   app.innerHTML = `${header}<main id="view" tabindex="-1">${v.body}</main>${fab}${nav}`;
   document.title = v.title ? `${v.title} · Kdo` : 'Kdo';
 }

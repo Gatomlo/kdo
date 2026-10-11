@@ -111,6 +111,12 @@ define('listes/:id', {
         ${ficheRows.length ? `<dl class="fiche-dl">${ficheRows.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join('')}</dl>` : ''}
         <p class="row wrap small">${!d.guest && (d.role === 'owner' || d.role === 'manager') ? `<a href="#/fiche/${owner.id}">📏 ${ficheRows.length ? 'Modifier la fiche' : 'Remplir la fiche tailles'}</a>` : ''}
           ${d.role === 'viewer' && !d.guest ? `<a href="#/idees/${owner.id}">💡 Idées secrètes</a>` : ''}</p></div>` : '';
+    // Offrants : barre d'avancement (disponibles / reserves / achetes).
+    const n = { free: 0, reserved: 0, bought: 0 };
+    if (d.canSeeGifts) d.items.forEach((i) => { if (i.gifts && !i.received) n[i.gifts.status]++; });
+    const progress = n.free + n.reserved + n.bought ? `<div class="split" role="img" aria-label="${n.reserved} réservés, ${n.bought} achetés, ${n.free} disponibles">
+        ${[['bought', 's-buy'], ['reserved', 's-res'], ['free', 's-free']].filter(([k]) => n[k]).map(([k, c]) => `<i class="${c}" style="flex:${n[k]}"></i>`).join('')}</div>
+      <p class="legend"><span><i class="s-buy"></i>${n.bought} acheté${n.bought > 1 ? 's' : ''}</span><span><i class="s-res"></i>${n.reserved} réservé${n.reserved > 1 ? 's' : ''}</span><span><i class="s-free"></i>${n.free} libre${n.free > 1 ? 's' : ''}</span></p>` : '';
     const hasInfo = list.welcome || d.event || ficheRows.length || d.role !== 'viewer' || !d.guest;
     const chips = d.items.length > 5 ? `<div class="chips" role="group" aria-label="Filtres">
         <button class="chip" data-a="f-cat" data-v="all" aria-pressed="${q.cat === 'all' && !q.free && !q.prio}">Tout</button>
@@ -128,6 +134,7 @@ define('listes/:id', {
               ${list.archived ? '<span class="pill p-buy">archivée</span>' : ''}${d.canSeeGifts ? `<span class="pill p-hide" title="Ne montre pas cet écran à ${esc(owner.name)}">🤫 caché à ${esc(owner.name)}</span>` : '<span class="pill p-mgr" title="Les réservations te restent cachées">🙈 sans spoiler</span>'}</p>
             ${hasInfo ? `<button class="ib" data-a="list-info" aria-expanded="${!!q.info}" aria-label="Informations" title="Informations">ℹ️</button>` : ''}</div>
           ${info}
+          ${progress ? `<div class="progress">${progress}</div>` : ''}
         </header>
         ${chips}
         ${groups.length ? groups.map((g) => `<section class="stack">${g.name ? `<h3 class="tag">${esc(g.name)}</h3>` : ''}${g.items.map((i) => itemCard(i, d)).join('')}</section>`).join('')
@@ -153,7 +160,7 @@ on('click', 'f-free', () => { S.q.free = !S.q.free; render(); });
 // Article : une ligne compacte (vignette, titre, ★ prix, statut, action rapide en icone) ;
 // touche = deplier (precisions, liens, reservations, discussion).
 const DOT = { free: ['dot-free', 'Disponible'], reserved: ['dot-res', 'Réservé'], bought: ['dot-buy', 'Acheté'] };
-const ib = (a, id, icon, label, extra = '') => `<button class="ib" data-a="${a}" data-id="${id}" ${extra} aria-label="${label}" title="${label}">${icon}<span class="lbl">${label}</span></button>`;
+const ib = (a, id, icon, label, extra = '', cls = '') => `<button class="ib${cls ? ` ${cls}` : ''}" data-a="${a}" data-id="${id}" ${extra} aria-label="${label}" title="${label}">${icon}<span class="lbl">${label}</span></button>`;
 
 function itemCard(i, d) {
   const g = i.gifts;
@@ -161,8 +168,8 @@ function itemCard(i, d) {
   const mine = g ? g.reservations.filter((r) => r.mine) : [];
   let quick = '';
   if (g && !i.received && g.status !== 'bought') {
-    if (i.groupGift) quick = ib('participate-sheet', i.id, '💶', mine.length ? 'Ma part' : 'Participer', 'class="ib primary"');
-    else if (g.available > 0) quick = ib('reserve', i.id, '🎁', 'Je réserve', 'class="ib primary"');
+    if (i.groupGift) quick = ib('participate-sheet', i.id, '💶', mine.length ? 'Ma part' : 'Participer', '', 'primary');
+    else if (g.available > 0) quick = ib('reserve', i.id, '🎁', 'Je réserve', '', 'primary');
   }
   if (d.canEdit) quick += ib('item-menu', i.id, '⋯', 'Actions');
   const status = i.received ? '<span class="dot dot-buy" title="Reçu">🎉</span>'
