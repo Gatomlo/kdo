@@ -371,7 +371,7 @@ define('ajouter', {
           <label>Nom<input name="title" required maxlength="200" value="${esc(sh ? sh.title : '')}" placeholder="Kit potager d’intérieur"></label>
           <label>Prix indicatif (€)<input name="price" inputmode="decimal" placeholder="35"></label>
         </div>
-        <fieldset class="bare"><legend>Dans quelle liste ?</legend><div class="chips">${mine.map((l) => `<label class="pick"><input type="radio" name="listId" value="${l.id}" ${l === first ? 'checked' : ''}><span>${esc(l.cover)} ${esc(l.title)}${l.owner.id !== S.me.id ? ` · ${esc(l.owner.name)}` : ''}</span></label>`).join('')}</div></fieldset>
+        <fieldset class="bare"><legend>Dans quelle liste ?</legend><div class="picks">${mine.map((l) => `<label class="pick"><input type="radio" name="listId" value="${l.id}" ${l === first ? 'checked' : ''}><span>${esc(l.cover)} ${esc(l.title)}${l.owner.id !== S.me.id ? ` · ${esc(l.owner.name)}` : ''}</span></label>`).join('')}</div></fieldset>
         <fieldset class="bare"><legend>Mon envie</legend><div class="wants">${WANTS.map(([v, st, l]) => `<label class="pick"><input type="radio" name="priority" value="${v}" ${v === 2 ? 'checked' : ''}><span><b>${st}</b>${l}</span></label>`).join('')}</div></fieldset>
         <label>Un détail pour la famille ?<input name="description" maxlength="2000" placeholder="Taille, couleur, « pas en rose »…"></label>
         <div class="stack"><button class="btn main wide">Ajouter à ma liste</button>
