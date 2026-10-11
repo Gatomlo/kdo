@@ -355,7 +355,10 @@ define('ajouter', {
     const mine = lists.filter((l) => l.role !== 'viewer' && !l.archived);
     const sh = S.q.shared;
     if (sh) S.q.shared = null;
-    const first = mine.find((l) => l.role === 'owner') || mine[0];
+    quickLists = sortLists(mine);
+    let last = null;
+    try { last = Number(localStorage.getItem('kdo-last-list')); } catch { /* stockage indisponible */ }
+    const first = quickLists.find((l) => l.id === last) || quickLists[0];
     return {
       title: 'Nouveau souhait', back: '#/', tab: 'listes',
       fab: { href: '#/listes/nouvelle', label: 'Nouvelle liste' },
@@ -371,7 +374,9 @@ define('ajouter', {
           <label>Nom<input name="title" required maxlength="200" value="${esc(sh ? sh.title : '')}" placeholder="Kit potager d’intérieur"></label>
           <label>Prix indicatif (€)<input name="price" inputmode="decimal" placeholder="35"></label>
         </div>
-        <fieldset class="bare"><legend>Dans quelle liste ?</legend><div class="picks">${mine.map((l) => `<label class="pick"><input type="radio" name="listId" value="${l.id}" ${l === first ? 'checked' : ''}><span>${esc(l.cover)} ${esc(l.title)}${l.owner.id !== S.me.id ? ` · ${esc(l.owner.name)}` : ''}</span></label>`).join('')}</div></fieldset>
+        <div class="stack"><span class="lbl-title">Dans quelle liste ?</span>
+          <input type="hidden" name="listId" value="${first ? first.id : ''}">
+          <button type="button" class="list-pick" data-a="quick-list" aria-haspopup="dialog">${first ? listChoice(first) : ''}<span class="chev" aria-hidden="true">›</span></button></div>
         <fieldset class="bare"><legend>Mon envie</legend><div class="wants">${WANTS.map(([v, st, l]) => `<label class="pick"><input type="radio" name="priority" value="${v}" ${v === 2 ? 'checked' : ''}><span><b>${st}</b>${l}</span></label>`).join('')}</div></fieldset>
         <label>Un détail pour la famille ?<input name="description" maxlength="2000" placeholder="Taille, couleur, « pas en rose »…"></label>
         <div class="stack"><button class="btn main wide">Ajouter à ma liste</button>
@@ -379,6 +384,39 @@ define('ajouter', {
       </form>` : empty('Pour ajouter un souhait, il te faut une liste. <a href="#/listes/nouvelle">Créer ma liste</a>'),
     };
   },
+});
+// Choix de la liste : une ligne, et un panneau (recherche au-dela de 6 listes).
+// Ordre : mes listes, puis celles que je gere par personne ; les plus proches d'abord.
+let quickLists = [];
+function sortLists(lists) {
+  const mineFirst = (l) => (l.owner.id === S.me.id ? '' : l.owner.name);
+  const when = (l) => (l.date && l.date >= new Date().toISOString().slice(0, 10) ? l.date : '9999');
+  return [...lists].sort((x, y) => mineFirst(x).localeCompare(mineFirst(y)) || when(x).localeCompare(when(y)) || x.title.localeCompare(y.title));
+}
+const listChoice = (l) => `<span class="cover" aria-hidden="true">${esc(l.cover)}</span><span class="grow"><b>${esc(l.title)}</b>
+  <span class="meta">${l.owner.id === S.me.id ? 'Ma liste' : `Liste de ${esc(l.owner.name)}`}${l.date ? ` · ${fmtDate(l.date, { day: 'numeric', month: 'short' })}` : ''} · ${l.itemCount ? `${l.itemCount} souhait${l.itemCount > 1 ? 's' : ''}` : 'vide'}</span></span>`;
+on('click', 'quick-list', () => {
+  const current = Number(document.querySelector('form[data-f=quick-add]').listId.value);
+  let group = null;
+  const rows = quickLists.map((l) => {
+    const g = l.owner.id === S.me.id ? 'Mes listes' : `Listes de ${l.owner.name}`;
+    const head = g !== group ? `<p class="tag" data-g>${esc((group = g))}</p>` : '';
+    return `${head}<button class="list-opt" data-a="quick-list-set" data-id="${l.id}" data-q="${esc(`${l.title} ${l.owner.name}`.toLowerCase())}" aria-pressed="${l.id === current}">${listChoice(l)}</button>`;
+  }).join('');
+  sheet(`<h3>Dans quelle liste ?</h3>${quickLists.length > 6 ? '<input type="search" placeholder="Rechercher une liste…" data-in="quick-list-filter" aria-label="Rechercher une liste">' : ''}
+    <div class="stack tight list-opts">${rows}</div>`, null, 'picker');
+});
+on('input', 'quick-list-filter', (el) => {
+  const q = el.value.trim().toLowerCase();
+  document.querySelectorAll('.list-opt').forEach((b) => { b.hidden = !!q && !b.dataset.q.includes(q); });
+  document.querySelectorAll('.list-opts [data-g]').forEach((t) => { t.hidden = !!q; });
+});
+on('click', 'quick-list-set', (el) => {
+  const l = quickLists.find((x) => x.id === Number(el.dataset.id));
+  const form = document.querySelector('form[data-f=quick-add]');
+  form.listId.value = l.id;
+  form.querySelector('.list-pick').innerHTML = `${listChoice(l)}<span class="chev" aria-hidden="true">›</span>`;
+  closeSheet();
 });
 let previewed = '';
 async function quickPreview() {
@@ -409,11 +447,15 @@ on('click', 'quick-paste', async () => {
 on('click', 'quick-more', () => {
   const form = document.querySelector('form[data-f=quick-add]');
   S.q.shared = { url: form.url.value.trim(), title: form.title.value };
-  go(`#/listes/${form.querySelector('[name=listId]:checked').value}/article/nouveau`);
+  go(`#/listes/${form.listId.value}/article/nouveau`);
 });
 on('submit', 'quick-add', async (form, f) => {
   const r = await attempt(() => post(`lists/${f.listId}/items`, { title: f.title, url: f.url, price: f.price, image: f.image, description: f.description, priority: Number(f.priority), quantity: 1 }));
-  if (r) { previewed = ''; toast(`« ${f.title} » ajouté`); go(`#/listes/${f.listId}`); }
+  if (r) {
+    previewed = '';
+    try { localStorage.setItem('kdo-last-list', f.listId); } catch { /* stockage indisponible */ }
+    toast(`« ${f.title} » ajouté`); go(`#/listes/${f.listId}`);
+  }
 });
 
 // ---------- Fiche article ----------
