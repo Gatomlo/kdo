@@ -38,7 +38,8 @@ ul { margin: 0; padding-left: 20px }
 svg { flex: none }
 
 /* ---------- Cadre ---------- */
-.shell { max-width: 680px; margin: 0 auto; min-height: 100dvh; display: flex; flex-direction: column }
+.shell { max-width: 680px; margin: 0 auto; min-height: 100dvh; display: flex; flex-direction: column; overflow-x: clip }
+.chips, .faces { overscroll-behavior-x: contain; touch-action: pan-x pan-y }
 header.top { position: sticky; top: 0; z-index: 3; padding: calc(10px + env(safe-area-inset-top)) 16px 10px; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); display: flex; align-items: center; gap: 8px }
 header.top h2 { font: 800 1.35rem/1.15 var(--display); letter-spacing: -.02em; flex: 1; min-width: 0; overflow-wrap: anywhere }
 header.top h2 small { display: block; font: 600 .8rem var(--body); color: var(--muted); letter-spacing: 0 }
@@ -161,7 +162,7 @@ input, select, textarea { background: var(--sunk); border: 1.5px solid transpare
 .row > .grow { width: auto }
 input[type="checkbox"], input[type="radio"] { width: 20px; height: 20px; min-height: 0; padding: 0; accent-color: var(--ribbon) }
 textarea { min-height: 80px; resize: vertical }
-fieldset { border: 1.5px solid var(--line); border-radius: var(--r); padding: 12px 14px; margin: 0; display: flex; flex-direction: column; gap: 8px }
+fieldset { min-width: 0; border: 1.5px solid var(--line); border-radius: var(--r); padding: 12px 14px; margin: 0; display: flex; flex-direction: column; gap: 8px }
 legend { font-weight: 800; padding: 0 6px; font-size: .84rem }
 details > summary { cursor: pointer; font-weight: 800; color: var(--plum); font-size: .88rem; min-height: 32px; display: flex; align-items: center }
 .covers { display: flex; flex-wrap: wrap; gap: 8px }
