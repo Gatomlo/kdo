@@ -2,7 +2,7 @@
 // quoi », listes rattachees), organisation du Secret Santa, enveloppe et messages anonymes.
 import { esc, on, toast, confirmSheet, eur, eurInput, fmtDate, daysUntil, avatar, plural } from './ui.js';
 import { get, post, patch, put, del, attempt } from './api.js';
-import { S, reload, go } from './state.js';
+import { S, reload, render, go } from './state.js';
 import { define } from './router.js';
 import { listCard, eventRow, empty } from './cards.js';
 
@@ -185,26 +185,33 @@ const thread = (msgs, mine) => msgs.map((m) => `<p class="msg ${m.direction === 
 define('evenements/:id/enveloppe', {
   load: (p) => get(`events/${p.id}/envelope`),
   view: (d) => {
+    S.q.envHidden = S.q.envHidden || {};
     const env = d.envelopes.map((e) => {
       const head = e.forName ? `<p class="tag">Enveloppe de ${esc(e.forName)}</p>` : '';
-      if (!e.opened) {
-        return `<section class="stack">${head}<button class="env-big" data-a="env-open" data-id="${e.pairId}"><span class="flap"></span><span class="seal">SS</span><span class="cta">Ouvrir l’enveloppe</span></button>
-          <p class="small muted center">Personne d’autre ne la verra, pas même l’organisateur.</p></section>`;
+      if (!e.opened || S.q.envHidden[e.pairId]) {
+        return `<section class="env-stage">${head}<h1>${e.opened ? 'Enveloppe refermée' : e.forName ? 'Son enveloppe est arrivée' : 'Ton enveloppe est arrivée'}</h1>
+          <p>${e.opened ? 'Touche-la pour revoir le nom.' : 'Ouvre-la quand personne ne regarde ton écran.'}</p>
+          <button class="env-big" data-a="${e.opened ? 'env-show' : 'env-open'}" data-id="${e.pairId}" aria-label="Ouvrir l’enveloppe"><span class="flap"></span><span class="seal">SS</span></button>
+          <span class="env-cta">👆 Touche l’enveloppe</span>
+          <p class="small">Personne d’autre ne la verra, pas même l’organisateur.</p></section>`;
       }
-      return `<section class="card stack reveal">${head}<p class="muted">${e.forName ? `${esc(e.forName)} offre` : 'Tu offres'} un cadeau à</p>
-        <div class="row">${avatar(e.receiver, 'lg')}<b class="target">${esc(e.receiver.name)}</b></div>
-        ${d.draw && (d.draw.budget || d.draw.deadline) ? `<p class="small">${d.draw.budget ? `Budget ${eur(d.draw.budget)}` : ''}${d.draw.deadline ? ` · avant le ${fmtDate(d.draw.deadline)}` : ''}</p>` : ''}
-        ${e.hints && e.hints.length ? `<div class="hints"><p class="tag">Ses idées pour toi</p><ul>${e.hints.map((h) => `<li>${esc(h)}</li>`).join('')}</ul></div>` : ''}
-        ${e.lists.length ? `<div class="stack tight">${e.lists.map((l) => `<a class="card row" href="#/listes/${l.id}"><span class="cover">${esc(l.cover)}</span><b class="grow">${esc(l.title)}</b>→</a>`).join('')}</div>` : `<p class="small muted">${esc(e.receiver.name)} n’a pas encore de liste.</p>`}
-        <details ${e.messages.length ? 'open' : ''}><summary>✉️ Poser une question anonyme</summary><div class="stack tight">
-          ${thread(e.messages, 'question')}
-          <form class="row" data-f="santa-msg" data-id="${e.pairId}" data-dir="question"><input name="body" maxlength="1000" placeholder="Ta pointure ? Ta couleur préférée ?" required class="grow"><button class="btn sm">Envoyer</button></form></div></details></section>`;
+      return `<section class="env-stage reveal">${head}<p>${e.forName ? `${esc(e.forName)} gâte` : 'Cette année, tu gâtes…'}</p>
+        <span class="env-av">${avatar(e.receiver, 'xl')}</span><b class="target">${esc(e.receiver.name)}</b>
+        ${d.draw && (d.draw.budget || d.draw.deadline) ? `<span class="pill">${d.draw.budget ? `Budget ${eur(d.draw.budget)}` : ''}${d.draw.deadline ? `${d.draw.budget ? ' · ' : ''}avant le ${fmtDate(d.draw.deadline, { day: 'numeric', month: 'long' })}` : ''}</span>` : ''}
+        <div class="card stack">
+          ${e.hints && e.hints.length ? `<h2>Ses idées</h2><ol class="hint-list">${e.hints.map((h) => `<li>${esc(h)}</li>`).join('')}</ol>` : ''}
+          ${e.lists.length ? `<div class="stack tight">${e.lists.map((l) => `<a class="btn ghost" href="#/listes/${l.id}">${esc(l.cover)} Voir « ${esc(l.title)} »</a>`).join('')}</div>` : `<p class="small muted">${esc(e.receiver.name)} n’a pas encore de liste.</p>`}
+          <details ${e.messages.length ? 'open' : ''}><summary>✉️ Poser une question anonyme</summary><div class="stack tight">
+            ${thread(e.messages, 'question')}
+            <form class="row" data-f="santa-msg" data-id="${e.pairId}" data-dir="question"><input name="body" maxlength="1000" placeholder="Ta pointure ? Ta couleur préférée ?" required class="grow"><button class="btn sm">Envoyer</button></form></div></details>
+        </div>
+        <button class="linkbtn" data-a="env-hide" data-id="${e.pairId}">Refermer (cacher l’écran)</button></section>`;
     }).join('');
     const received = d.received.filter((r) => r.messages.length).map((r) => `<section class="card stack"><h2>Questions de ${r.forName ? `Secret Santa de ${esc(r.forName)}` : 'ton Secret Santa'}</h2>
       ${thread(r.messages, 'reply')}
       <form class="row" data-f="santa-msg" data-id="${r.pairId}" data-dir="reply"><input name="body" maxlength="1000" placeholder="Ta réponse" required class="grow"><button class="btn sm">Répondre</button></form></section>`).join('');
     return {
-      title: 'Secret Santa', sub: d.event.title, back: `#/evenements/${d.event.id}`, tab: 'evenements',
+      title: 'Secret Santa', sub: d.event.title, back: `#/evenements/${d.event.id}`, tab: 'evenements', mood: d.envelopes.length ? 'santa' : null,
       body: `<div class="stack-lg">${d.draw && d.draw.status === 'drawn' ? '' : '<p class="notice info">🎅 Le tirage n’a pas encore eu lieu.</p>'}
         ${d.revealed ? `<section class="card stack"><h2>🎁 Qui offrait à qui</h2><ul class="small">${d.revealed.map((p) => `<li>${esc(p.giver)} → ${esc(p.receiver)}</li>`).join('')}</ul></section>` : ''}
         ${env || (d.draw && d.draw.status === 'drawn' ? empty('Tu ne participes pas à ce tirage.') : '')}${received}
@@ -223,6 +230,8 @@ on('click', 'env-open', async (el) => {
   await new Promise((r) => setTimeout(r, 600));
   if (await attempt(() => post(`santa-pairs/${el.dataset.id}/open`))) reload();
 });
+on('click', 'env-hide', (el) => { S.q.envHidden[el.dataset.id] = true; render(); window.scrollTo(0, 0); });
+on('click', 'env-show', (el) => { delete S.q.envHidden[el.dataset.id]; render(); });
 on('submit', 'santa-msg', async (form, f) => {
   if (await attempt(() => post(`santa-pairs/${form.dataset.id}/messages`, { direction: form.dataset.dir, body: f.body }))) { toast('Message envoyé'); reload(); }
 });

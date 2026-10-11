@@ -1,6 +1,6 @@
 // Point d'entree : connexion (mot de passe, invitation, lien e-mail), navigation par #,
 // cadre de l'ecran (en-tete, navigation en bas).
-import { esc, on, toast, avatar } from './ui.js';
+import { esc, on, toast, avatar, closeSheet } from './ui.js';
 import { get, post, ApiError } from './api.js';
 import { S, setReloader, setRenderer, go } from './state.js';
 import { match } from './router.js';
@@ -68,7 +68,7 @@ function shell(v) {
   const fab = nonav && v.fab ? (v.fab.href
     ? `<a class="fab" href="${esc(v.fab.href)}">${ICONS.plus}<span>${esc(v.fab.label)}</span></a>`
     : `<button class="fab" data-a="${esc(v.fab.action)}">${ICONS.plus}<span>${esc(v.fab.label)}</span></button>`) : '';
-  app.className = 'shell' + (nonav ? ' nonav' : '');
+  app.className = 'shell' + (nonav ? ' nonav' : '') + (v.mood ? ` mood-${v.mood}` : '');
   const today = new Date().toLocaleDateString('fr-BE', { weekday: 'long', day: 'numeric', month: 'long' });
   const titleHtml = v.hello ? `<div class="hello"><small>${esc(today)}</small><h1>${esc(v.hello)}</h1></div>`
     : v.title ? `<h2>${esc(v.title)}${v.sub ? `<small>${esc(v.sub)}</small>` : ''}</h2>` : '<a class="brand" href="#/">K<i>do</i></a>';
@@ -76,6 +76,7 @@ function shell(v) {
       ${titleHtml}${v.right || ''}${gear}${me}</header>`;
   app.innerHTML = `${header}<main id="view" tabindex="-1">${v.body}</main>${fab}${nav}`;
   document.title = v.title ? `${v.title} · Kdo` : 'Kdo';
+  if (v.after) v.after();
 }
 
 let current = null; // { route, params }
@@ -114,7 +115,7 @@ setRenderer(() => {
   window.scrollTo(0, y);
 });
 
-window.addEventListener('hashchange', () => { load().then(() => window.scrollTo(0, 0)); });
+window.addEventListener('hashchange', () => { closeSheet(); S.q.open = null; load().then(() => window.scrollTo(0, 0)); });
 on('click', 'go', (el) => go(el.dataset.to));
 
 // Mode clair / sombre (memorise sur l'appareil).

@@ -39,20 +39,25 @@ document.addEventListener('submit', (ev) => {
 });
 
 // ---------- Panneau (bas sur mobile, dialogue centre sur PC) ----------
-export function sheet(html) {
+// onDismiss : appele quand la personne ferme le panneau (fond, Echap, bouton Fermer),
+// pas quand le code le remplace par un autre.
+let onDismiss = null;
+export function sheet(html, dismissed = null, cls = '') {
   closeSheet();
   const bg = document.createElement('div');
   bg.className = 'sheet-bg';
-  bg.innerHTML = `<div class="sheet" role="dialog" aria-modal="true">${html}</div>`;
-  bg.addEventListener('click', (e) => { if (e.target === bg) closeSheet(); });
+  bg.innerHTML = `<div class="sheet${cls ? ` ${cls}` : ''}" role="dialog" aria-modal="true">${html}</div>`;
+  bg.addEventListener('click', (e) => { if (e.target === bg) dismissSheet(); });
   document.body.appendChild(bg);
-  const first = bg.querySelector('input:not([type=hidden]):not([type=checkbox]):not([type=radio]),select,textarea');
+  onDismiss = dismissed;
+  const first = !cls && bg.querySelector('input:not([type=hidden]):not([type=checkbox]):not([type=radio]),select,textarea');
   if (first) first.focus();
   return bg.querySelector('.sheet');
 }
-export function closeSheet() { document.querySelectorAll('.sheet-bg').forEach((e) => e.remove()); }
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSheet(); });
-on('click', 'close-sheet', () => closeSheet());
+export function closeSheet() { onDismiss = null; document.querySelectorAll('.sheet-bg').forEach((e) => e.remove()); }
+export function dismissSheet() { const fn = onDismiss; closeSheet(); if (fn) fn(); }
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') dismissSheet(); });
+on('click', 'close-sheet', () => dismissSheet());
 
 // Confirmation : resout true / false.
 export function confirmSheet({ title, text, ok = 'Confirmer', danger = false }) {
