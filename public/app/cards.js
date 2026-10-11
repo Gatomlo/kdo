@@ -1,5 +1,6 @@
 // Cartes reutilisees par plusieurs ecrans : liste, evenement.
-import { esc, avatar, fmtDate, plural } from './ui.js';
+import { esc, avatar, fmtDate, plural, sheet, on } from './ui.js';
+import { get } from './api.js';
 
 const ROLE = { owner: 'ma liste', co_owner: 'co-propriétaire', manager: 'je gère' };
 
@@ -24,3 +25,14 @@ export function eventRow(e) {
 }
 
 export const empty = (text) => `<p class="empty">${text}</p>`;
+
+// Lien a transmettre, avec son QR code (a scanner avec l'appareil photo du telephone).
+// shareText : propose aussi le partage du telephone (« Envoyer… ») quand il existe.
+export const linkSheet = (title, url, text, shareText) => {
+  const send = shareText && navigator.share ? `<button class="btn ghost" data-a="share-native" data-url="${esc(url)}" data-text="${esc(shareText)}">Envoyer…</button>` : '';
+  sheet(`<h3>${esc(title)}</h3><p class="muted small">${text}</p>
+  <div class="qr" id="qr" aria-label="QR code du lien"></div>
+  <input readonly value="${esc(url)}" class="select-all"><div class="row end wrap"><button class="btn ghost" data-a="close-sheet">Fermer</button>${send}<button class="btn main" data-a="copy" data-text="${esc(url)}">Copier le lien</button></div>`);
+  get(`qr?text=${encodeURIComponent(url)}`).then((r) => { const el = document.getElementById('qr'); if (el) el.innerHTML = r.svg; }, () => {});
+};
+on('click', 'share-native', (el) => navigator.share({ text: el.dataset.text, url: el.dataset.url }).catch(() => {}));
