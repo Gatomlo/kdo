@@ -487,8 +487,7 @@ function shareSection(d) {
     <input readonly value="${esc(s.url)}" class="select-all" aria-label="Lien de partage">
     <div class="row wrap"><button class="btn main sm" data-a="copy" data-text="${esc(s.url)}">Copier le lien</button>
       <button class="btn ghost sm" data-a="share-qr" data-url="${esc(s.url)}">QR code</button>
-      ${navigator.share ? `<button class="btn ghost sm" data-a="share-native" data-url="${esc(s.url)}">Envoyer…</button>` : ''}
-      <a class="btn ghost sm" href="https://wa.me/?text=${encodeURIComponent(`Ma liste de cadeaux « ${d.list.title} » : ${s.url}`)}" target="_blank" rel="noopener noreferrer">WhatsApp</a></div>
+      ${navigator.share ? `<button class="btn ghost sm" data-a="share-native" data-url="${esc(s.url)}">Envoyer…</button>` : ''}</div>
     <form class="stack tight" data-f="share-pass"><label>Mot de passe ${s.hasPassword ? '<span class="pill p-free">actif</span>' : '<span class="muted">(facultatif)</span>'}
       <input name="password" type="text" autocomplete="off" minlength="4" maxlength="100" placeholder="${s.hasPassword ? 'Nouveau mot de passe' : 'ex. sapin2026'}"></label>
       <p class="small muted">${s.hasPassword ? 'Le lien seul ne suffit pas : l’invité doit aussi saisir le mot de passe (à lui donner à part). Le changer déconnecte les invités déjà entrés.' : 'Sans mot de passe, toute personne qui a le lien peut voir la liste.'}</p>
