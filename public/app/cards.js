@@ -1,5 +1,6 @@
 // Cartes reutilisees par plusieurs ecrans : liste, evenement.
-import { esc, avatar, fmtDate, plural } from './ui.js';
+import { esc, avatar, fmtDate, plural, sheet } from './ui.js';
+import { get } from './api.js';
 
 const ROLE = { owner: 'ma liste', co_owner: 'co-propriétaire', manager: 'je gère' };
 
@@ -24,3 +25,11 @@ export function eventRow(e) {
 }
 
 export const empty = (text) => `<p class="empty">${text}</p>`;
+
+// Lien a transmettre, avec son QR code (a scanner avec l'appareil photo du telephone).
+export const linkSheet = (title, url, text) => {
+  sheet(`<h3>${esc(title)}</h3><p class="muted small">${text}</p>
+  <div class="qr" id="qr" aria-label="QR code du lien"></div>
+  <input readonly value="${esc(url)}" class="select-all"><div class="row end"><button class="btn ghost" data-a="close-sheet">Fermer</button><button class="btn main" data-a="copy" data-text="${esc(url)}">Copier le lien</button></div>`);
+  get(`qr?text=${encodeURIComponent(url)}`).then((r) => { const el = document.getElementById('qr'); if (el) el.innerHTML = r.svg; }, () => {});
+};

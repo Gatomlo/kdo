@@ -3,7 +3,7 @@ import { esc, on, toast, sheet, closeSheet, confirmSheet, avatar, fmtDate } from
 import { get, post, patch, put, del, attempt } from './api.js';
 import { S, reload } from './state.js';
 import { define } from './router.js';
-import { empty } from './cards.js';
+import { empty, linkSheet } from './cards.js';
 
 // Ligne « anniversaire · idees » sous le nom d'un membre.
 function extras(m, ideas) {
@@ -14,13 +14,6 @@ function extras(m, ideas) {
   return `<span class="meta">${birthday}<a class="chiplet" href="#/fiche/${m.id}" title="Tailles et préférences">📏</a>${idea}</span>`;
 }
 
-// Lien a transmettre, avec son QR code (a scanner avec l'appareil photo du telephone).
-const linkSheet = (title, url, text) => {
-  sheet(`<h3>${esc(title)}</h3><p class="muted small">${text}</p>
-  <div class="qr" id="qr" aria-label="QR code du lien"></div>
-  <input readonly value="${esc(url)}" class="select-all"><div class="row end"><button class="btn ghost" data-a="close-sheet">Fermer</button><button class="btn main" data-a="copy" data-text="${esc(url)}">Copier le lien</button></div>`);
-  get(`qr?text=${encodeURIComponent(url)}`).then((r) => { const el = document.getElementById('qr'); if (el) el.innerHTML = r.svg; }, () => {});
-};
 document.addEventListener('focusin', (e) => { if (e.target.classList && e.target.classList.contains('select-all')) e.target.select(); });
 
 define('cercle', {

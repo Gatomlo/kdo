@@ -6,7 +6,7 @@ import { esc, on, toast, sheet, closeSheet, confirmSheet, eur, eurInput, fmtDate
 import { get, post, patch, put, del, attempt, uploadPhoto, linkPreview } from './api.js';
 import { S, reload, render, go } from './state.js';
 import { define } from './router.js';
-import { listCard, empty } from './cards.js';
+import { listCard, empty, linkSheet } from './cards.js';
 
 const COVERS = ['🎁', '🎄', '🎂', '👶', '💍', '🎓', '🏡', '🌟', '🧸', '📚'];
 const PRIORITIES = [[3, '★★★ Très envie'], [2, '★★ Envie'], [1, '★ Si l’occasion se présente']];
@@ -486,6 +486,7 @@ function shareSection(d) {
   return `<section class="card stack"><h2>Partager hors du cercle</h2>${intro}
     <input readonly value="${esc(s.url)}" class="select-all" aria-label="Lien de partage">
     <div class="row wrap"><button class="btn main sm" data-a="copy" data-text="${esc(s.url)}">Copier le lien</button>
+      <button class="btn ghost sm" data-a="share-qr" data-url="${esc(s.url)}">QR code</button>
       ${navigator.share ? `<button class="btn ghost sm" data-a="share-native" data-url="${esc(s.url)}">Envoyer…</button>` : ''}
       <a class="btn ghost sm" href="https://wa.me/?text=${encodeURIComponent(`Ma liste de cadeaux « ${d.list.title} » : ${s.url}`)}" target="_blank" rel="noopener noreferrer">WhatsApp</a></div>
     <form class="stack tight" data-f="share-pass"><label>Mot de passe ${s.hasPassword ? '<span class="pill p-free">actif</span>' : '<span class="muted">(facultatif)</span>'}
@@ -498,6 +499,7 @@ function shareSection(d) {
 const shareCall = async (fn, msg) => { if (await attempt(fn)) { if (msg) toast(msg); reload(); } };
 on('click', 'share-on', () => shareCall(() => post(`lists/${listId()}/share`), 'Lien de partage créé'));
 on('click', 'share-native', (el) => navigator.share({ title: S.data.list.title, text: `Ma liste de cadeaux « ${S.data.list.title} »`, url: el.dataset.url }).catch(() => {}));
+on('click', 'share-qr', (el) => linkSheet(`Liste « ${S.data.list.title} »`, el.dataset.url, `À scanner avec l’appareil photo du téléphone (ou à imprimer pour une carte de vœux).${S.data.share.hasPassword ? ' Le mot de passe reste demandé : donne-le à part.' : ''}`));
 on('submit', 'share-pass', (form, f) => { if (f.password.trim()) shareCall(() => put(`lists/${listId()}/share/password`, { password: f.password.trim() }), 'Mot de passe enregistré'); });
 on('click', 'share-pass-off', () => shareCall(() => put(`lists/${listId()}/share/password`, { password: null }), 'Mot de passe retiré'));
 on('click', 'share-renew', async () => {
