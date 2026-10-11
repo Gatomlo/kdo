@@ -126,6 +126,7 @@ define('listes/:id', {
           <div class="row"><span class="cover" aria-hidden="true">${esc(list.cover)}</span>
             <p class="meta grow">${avatar(owner, 'sm')} ${esc(owner.name)}${d.roles.filter((r) => r.role === 'co_owner').map((r) => ` & ${esc(r.name)}`).join('')}${list.date ? ` · ${fmtDate(list.date, { day: 'numeric', month: 'short' })}` : ''}
               ${list.archived ? '<span class="pill p-buy">archivée</span>' : ''}${d.canSeeGifts ? `<span class="pill p-hide" title="Ne montre pas cet écran à ${esc(owner.name)}">🤫 caché à ${esc(owner.name)}</span>` : '<span class="pill p-mgr" title="Les réservations te restent cachées">🙈 sans spoiler</span>'}</p>
+            ${d.canEdit && !d.guest && !list.archived ? '<button class="ib" data-a="list-share" aria-label="Partager" title="Partager"><span aria-hidden="true">🔗</span><span class="lbl">Partager</span></button>' : ''}
             ${hasInfo ? `<button class="ib" data-a="list-info" aria-expanded="${!!q.info}" aria-label="Informations" title="Informations">ℹ️</button>` : ''}</div>
           ${info}
         </header>
@@ -487,7 +488,7 @@ function shareSection(d) {
     <input readonly value="${esc(s.url)}" class="select-all" aria-label="Lien de partage">
     <div class="row wrap"><button class="btn main sm" data-a="copy" data-text="${esc(s.url)}">Copier le lien</button>
       <button class="btn ghost sm" data-a="share-qr" data-url="${esc(s.url)}">QR code</button>
-      ${navigator.share ? `<button class="btn ghost sm" data-a="share-native" data-url="${esc(s.url)}">Envoyer…</button>` : ''}</div>
+      ${navigator.share ? `<button class="btn ghost sm" data-a="share-native" data-url="${esc(s.url)}" data-text="${esc(shareText(d.list))}">Envoyer…</button>` : ''}</div>
     <form class="stack tight" data-f="share-pass"><label>Mot de passe ${s.hasPassword ? '<span class="pill p-free">actif</span>' : '<span class="muted">(facultatif)</span>'}
       <input name="password" type="text" autocomplete="off" minlength="4" maxlength="100" placeholder="${s.hasPassword ? 'Nouveau mot de passe' : 'ex. sapin2026'}"></label>
       <p class="small muted">${s.hasPassword ? 'Le lien seul ne suffit pas : l’invité doit aussi saisir le mot de passe (à lui donner à part). Le changer déconnecte les invités déjà entrés.' : 'Sans mot de passe, toute personne qui a le lien peut voir la liste.'}</p>
@@ -497,8 +498,21 @@ function shareSection(d) {
 }
 const shareCall = async (fn, msg) => { if (await attempt(fn)) { if (msg) toast(msg); reload(); } };
 on('click', 'share-on', () => shareCall(() => post(`lists/${listId()}/share`), 'Lien de partage créé'));
-on('click', 'share-native', (el) => navigator.share({ title: S.data.list.title, text: `Ma liste de cadeaux « ${S.data.list.title} »`, url: el.dataset.url }).catch(() => {}));
-on('click', 'share-qr', (el) => linkSheet(`Liste « ${S.data.list.title} »`, el.dataset.url, `À scanner avec l’appareil photo du téléphone (ou à imprimer pour une carte de vœux).${S.data.share.hasPassword ? ' Le mot de passe reste demandé : donne-le à part.' : ''}`));
+const shareText = (list) => `Liste de cadeaux « ${list.title} »`;
+const shareSheet = (list, s) => linkSheet(`Partager « ${list.title} »`, s.url, `À scanner avec l’appareil photo du téléphone, à copier ou à envoyer.${s.hasPassword ? ' Le mot de passe reste demandé : donne-le à part.' : ''}`, shareText(list));
+on('click', 'share-qr', () => shareSheet(S.data.list, S.data.share));
+// Raccourci depuis la vue de la liste : cree le lien au besoin (apres confirmation).
+on('click', 'list-share', async () => {
+  const list = S.data.list;
+  let s = await attempt(() => get(`lists/${list.id}/share`));
+  if (!s) return;
+  if (!s.enabled) {
+    if (!await confirmSheet({ title: 'Partager hors du cercle', text: 'Créer un lien pour quelqu’un sans compte (parrain, grand-mère…) ? Il verra cette liste seulement, en vue offrant, et pourra réserver. Mot de passe et invités se gèrent dans les réglages de la liste.', ok: 'Créer le lien' })) return;
+    s = await attempt(() => post(`lists/${list.id}/share`));
+    if (!s) return;
+  }
+  shareSheet(list, s);
+});
 on('submit', 'share-pass', (form, f) => { if (f.password.trim()) shareCall(() => put(`lists/${listId()}/share/password`, { password: f.password.trim() }), 'Mot de passe enregistré'); });
 on('click', 'share-pass-off', () => shareCall(() => put(`lists/${listId()}/share/password`, { password: null }), 'Mot de passe retiré'));
 on('click', 'share-renew', async () => {
