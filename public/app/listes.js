@@ -95,10 +95,13 @@ define('listes/:id', {
     const { list, owner } = d;
     const q = S.q;
     const visible = d.items.filter((i) => (q.cat === 'all' || (q.cat === 'none' ? i.categoryId == null : i.categoryId === q.cat))
-      && i.priority >= q.prio && (!q.free || (i.gifts && i.gifts.status === 'free')));
+      && i.priority >= q.prio && (!q.free || (i.gifts && i.gifts.status === 'free')) && fitsBudget(i, q.budget));
     const known = new Set(d.categories.map((c) => c.id));
-    const groups = [...d.categories.map((c) => ({ name: c.name, items: visible.filter((i) => i.categoryId === c.id) })),
-      { name: d.categories.length ? 'Autres' : '', items: visible.filter((i) => i.categoryId == null || !known.has(i.categoryId)) }].filter((g) => g.items.length);
+    // Tri par prix : une seule liste (sans categories), articles sans prix a la fin.
+    const groups = q.sort ? [{ name: '', items: [...visible].sort((x, y) => (x.price == null) - (y.price == null) || (x.price - y.price) * (q.sort === 'desc' ? -1 : 1)) }].filter((g) => g.items.length)
+      : [...d.categories.map((c) => ({ name: c.name, items: visible.filter((i) => i.categoryId === c.id) })),
+        { name: d.categories.length ? 'Autres' : '', items: visible.filter((i) => i.categoryId == null || !known.has(i.categoryId)) }].filter((g) => g.items.length);
+    const priced = d.items.some((i) => i.price != null);
     const used = d.categories.filter((c) => d.items.some((i) => i.categoryId === c.id));
     // Une seule ligne d'information selon le role (vue epuree).
     const f = d.ownerFiche;
@@ -118,8 +121,10 @@ define('listes/:id', {
         ${[['bought', 's-buy'], ['reserved', 's-res'], ['free', 's-free']].filter(([k]) => n[k]).map(([k, c]) => `<i class="${c}" style="flex:${n[k]}"></i>`).join('')}</div>
       <p class="legend"><span><i class="s-buy"></i>${n.bought} acheté${n.bought > 1 ? 's' : ''}</span><span><i class="s-res"></i>${n.reserved} réservé${n.reserved > 1 ? 's' : ''}</span><span><i class="s-free"></i>${n.free} libre${n.free > 1 ? 's' : ''}</span></p>` : '';
     const hasInfo = list.welcome || d.event || ficheRows.length || d.role !== 'viewer' || !d.guest;
-    const chips = d.items.length > 5 ? `<div class="chips" role="group" aria-label="Filtres">
-        <button class="chip" data-a="f-cat" data-v="all" aria-pressed="${q.cat === 'all' && !q.free && !q.prio}">Tout</button>
+    const chips = d.items.length > 5 || (priced && d.items.length > 2) || q.budget ? `<div class="chips" role="group" aria-label="Filtres">
+        <button class="chip" data-a="f-cat" data-v="all" aria-pressed="${q.cat === 'all' && !q.free && !q.prio && !q.budget && !q.sort}">Tout</button>
+        ${priced || q.budget ? `<button class="chip" data-a="f-budget" aria-pressed="${!!q.budget}">💶 ${q.budget ? `≤ ${eur(q.budget)}` : 'Budget'}</button>
+          <button class="chip" data-a="f-sort" aria-pressed="${!!q.sort}">${q.sort === 'asc' ? 'Prix ↑' : q.sort === 'desc' ? 'Prix ↓' : 'Trier par prix'}</button>` : ''}
         ${d.canSeeGifts ? `<button class="chip" data-a="f-free" aria-pressed="${q.free}">Disponibles</button>` : ''}
         <button class="chip" data-a="f-prio" aria-pressed="${q.prio === 3}">★★★</button>
         ${used.length > 1 ? used.map((c) => `<button class="chip" data-a="f-cat" data-v="${c.id}" aria-pressed="${q.cat === c.id}">${esc(c.name)}</button>`).join('') : ''}</div>` : '';
@@ -147,13 +152,36 @@ define('listes/:id', {
   },
 });
 on('click', 'f-cat', (el) => {
-  if (el.dataset.v === 'all') { S.q.cat = 'all'; S.q.free = false; S.q.prio = 0; } else S.q.cat = S.q.cat === Number(el.dataset.v) ? 'all' : Number(el.dataset.v);
+  if (el.dataset.v === 'all') { S.q.cat = 'all'; S.q.free = false; S.q.prio = 0; S.q.budget = null; S.q.sort = null; } else S.q.cat = S.q.cat === Number(el.dataset.v) ? 'all' : Number(el.dataset.v);
   render();
 });
 on('click', 'list-info', () => { S.q.info = !S.q.info; render(); });
 on('click', 'item-open', (el) => openItem(Number(el.dataset.id)));
 on('click', 'f-prio', () => { S.q.prio = S.q.prio === 3 ? 0 : 3; render(); });
 on('click', 'f-free', () => { S.q.free = !S.q.free; render(); });
+on('click', 'f-sort', () => { S.q.sort = S.q.sort === 'asc' ? 'desc' : S.q.sort === 'desc' ? null : 'asc'; render(); });
+
+// Budget (garde d'une liste a l'autre pendant la session) : articles dont le prix tient dedans ;
+// un cadeau commun pas encore finance tient toujours (on peut y mettre une part).
+// Sans prix : masque, on ne sait pas.
+function fitsBudget(i, max) {
+  if (!max) return true;
+  if (i.groupGift && !(i.gifts && i.gifts.status === 'bought') && !(i.price && i.gifts && i.gifts.funded >= i.price)) return true;
+  return i.price != null && i.price <= max;
+}
+on('click', 'f-budget', () => {
+  const cur = S.q.budget;
+  sheet(`<h3>💶 Mon budget</h3><p class="small muted">N’affiche que les cadeaux à ce prix ou moins (et les cadeaux communs, où l’on peut mettre une part).</p>
+    <div class="row wrap">${[1000, 2000, 3000, 5000, 10000].map((v) => `<button type="button" class="chip" data-a="budget-set" data-v="${v}" aria-pressed="${cur === v}">${eur(v)}</button>`).join('')}</div>
+    <form class="row" data-f="budget"><input name="max" inputmode="decimal" class="grow" placeholder="Autre montant (€)" aria-label="Budget en euros" value="${cur && ![1000, 2000, 3000, 5000, 10000].includes(cur) ? esc(eurInput(cur)) : ''}"><button class="btn main">OK</button></form>
+    <div class="row end">${cur ? '<button type="button" class="btn ghost" data-a="budget-set" data-v="0">Sans budget</button>' : ''}<button type="button" class="btn ghost" data-a="close-sheet">Fermer</button></div>`);
+});
+const setBudget = (cents) => { S.q.budget = cents > 0 ? cents : null; closeSheet(); render(); };
+on('click', 'budget-set', (el) => setBudget(Number(el.dataset.v)));
+on('submit', 'budget', (form, f) => {
+  const v = Math.round(parseFloat(String(f.max).replace(',', '.').replace(/[^\d.]/g, '')) * 100);
+  if (v > 0) setBudget(v); else toast('Indique un montant', true);
+});
 
 // Article : une ligne compacte (vignette, titre, ★ prix, statut, action rapide en icone) ;
 // touche = deplier (precisions, liens, reservations, discussion).
