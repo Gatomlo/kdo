@@ -14,6 +14,7 @@ import './idees.js';
 import './cadeaux.js';
 import './recherche.js';
 import './journal.js';
+import './corbeille.js';
 
 const app = document.getElementById('app');
 

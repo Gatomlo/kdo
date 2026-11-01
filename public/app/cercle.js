@@ -143,6 +143,7 @@ define('reglages', {
   view: (s) => ({
     title: 'Réglages de l’app', back: '#/cercle', tab: 'cercle',
     body: `<div class="stack-lg">
+      <a class="card lc" href="#/corbeille"><span class="cover">🗑️</span><span class="grow"><b>Corbeille</b><span class="meta">Articles et listes supprimés, récupérables 7 jours</span></span>→</a>
       <a class="card lc" href="#/journal"><span class="cover">📒</span><span class="grow"><b>Journal</b><span class="meta">Arrivées, invitations en attente, partages, activité</span></span>→</a>
       <form class="card stack" data-f="settings-mail"><h2>E-mails</h2>
         <p class="small muted">Facultatif. Sans serveur d’envoi, tout fonctionne avec des liens à copier. Avec : lien de connexion par e-mail, invitations envoyées, notifications (article réservé modifié, enveloppe Secret Santa, rappel une semaine avant l’événement…).</p>

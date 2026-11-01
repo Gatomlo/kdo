@@ -7,7 +7,7 @@ import { define } from './router.js';
 import { empty } from './cards.js';
 
 const when = (t) => new Date(t).toLocaleString('fr-BE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-const ICON = { setup: '🏠', join: '👋', guest: '🔗', invite: '✉️', remove: '🚪', share: '🔗', santa: '🎅', settings: '⚙️', birthday: '🎂' };
+const ICON = { setup: '🏠', join: '👋', guest: '🔗', invite: '✉️', remove: '🚪', share: '🔗', santa: '🎅', settings: '⚙️', birthday: '🎂', trash: '🗑️' };
 
 define('journal', {
   load: () => get('admin/journal'),
