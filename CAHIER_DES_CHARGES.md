@@ -14,7 +14,7 @@ Permettre aux membres d'une famille de :
 
 ## 2. Le cercle familial
 
-- L'application héberge **un cercle familial** (une famille = une instance).
+- L'application héberge **un ou plusieurs cercles familiaux indépendants** (étanches entre eux) ; un **administrateur de la plateforme** crée les cercles et transmet à chacun le lien de son administrateur.
 - Chaque membre a un **compte** : connexion par **e-mail + mot de passe** (le serveur de prod n'envoie pas d'e-mails, comme pour Le Cabas) ; lien de connexion par e-mail en option si un SMTP est configuré.
 - Un **administrateur du cercle** invite les membres par un **lien d'invitation** à transmettre (envoyé par e-mail si possible).
 - **Profils sans compte** (enfants, personnes âgées sans e-mail) : créés par un adulte qui en devient automatiquement **gestionnaire**.

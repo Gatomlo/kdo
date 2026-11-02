@@ -15,6 +15,7 @@ import './cadeaux.js';
 import './recherche.js';
 import './journal.js';
 import './corbeille.js';
+import './plateforme.js';
 
 const app = document.getElementById('app');
 

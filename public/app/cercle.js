@@ -139,13 +139,14 @@ on('click', 'birthday-clear', () => saveBirthday(document.querySelector('form[da
 
 // ---------- Reglages de l'app (administrateur) ----------
 define('reglages', {
-  load: () => get('settings'),
+  load: async () => (S.me.isSuper ? { ...(await get('settings')), isSuper: true } : { isSuper: false }),
   view: (s) => ({
     title: 'Réglages de l’app', back: '#/cercle', tab: 'cercle',
     body: `<div class="stack-lg">
       <a class="card lc" href="#/corbeille"><span class="cover">🗑️</span><span class="grow"><b>Corbeille</b><span class="meta">Articles et listes supprimés, récupérables 7 jours</span></span>→</a>
       <a class="card lc" href="#/journal"><span class="cover">📒</span><span class="grow"><b>Journal</b><span class="meta">Arrivées, invitations en attente, partages, activité</span></span>→</a>
-      <form class="card stack" data-f="settings-mail"><h2>E-mails</h2>
+      ${s.isSuper ? `<a class="card lc" href="#/plateforme"><span class="cover">🏘️</span><span class="grow"><b>Plateforme</b><span class="meta">Créer et gérer les cercles familiaux</span></span>→</a>` : ''}
+      ${s.isSuper ? `<form class="card stack" data-f="settings-mail"><h2>E-mails</h2>
         <p class="small muted">Facultatif. Sans serveur d’envoi, tout fonctionne avec des liens à copier. Avec : lien de connexion par e-mail, invitations envoyées, notifications (article réservé modifié, enveloppe Secret Santa, rappel une semaine avant l’événement…).</p>
         <p class="banner ${s.mode === 'off' ? 'info' : 'hide'}">${s.mode === 'off' ? '📭 <span>Envoi désactivé.</span>' : s.forced ? `🔧 <span>Mode imposé par le serveur : <b>${esc(s.mode)}</b>.</span>` : s.envFallback ? '✉️ <span>Envoi actif (configuré sur le serveur).</span>' : '✉️ <span>Envoi actif.</span>'}</p>
         <label>Serveur SMTP<input name="host" value="${esc(s.host)}" placeholder="mail.infomaniak.com"></label>
@@ -164,7 +165,7 @@ define('reglages', {
         <p class="small muted">Adresse utilisée dans les liens d’invitation, de partage et les e-mails. À renseigner une fois en ligne (ex. <code>https://ton-domaine.be/kdo</code>).${s.publicUrlEnv ? ' Actuellement imposée par le serveur.' : ''}</p>
         <label>Adresse<input name="publicUrl" type="url" value="${esc(s.publicUrl)}" placeholder="${esc(s.detectedUrl)}" ${s.publicUrlEnv ? 'disabled' : ''}></label>
         <p class="small muted">Adresse utilisée actuellement : <code>${esc(s.detectedUrl)}</code></p>
-        <button class="btn" ${s.publicUrlEnv ? 'disabled' : ''}>Enregistrer</button></form>
+        <button class="btn" ${s.publicUrlEnv ? 'disabled' : ''}>Enregistrer</button></form>` : ''}
     </div>`,
   }),
 });
