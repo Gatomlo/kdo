@@ -58,3 +58,5 @@ Dossier `apps/kdo` de la passerelle → servi sur `/kdo` (local : jonction `node
 Réponses en français, concises. Tester par l'API (`npm test`) avant l'interface. Commit après chaque fonctionnalité validée.
 
 - Connexion centralisée (node-gateway) : `lib/gateway-bridge.js` (copie de `node-gateway/docs/gateway-bridge.js`) + `loadUser` dans `lib/auth.js`. Si la passerelle fournit `req.gateway` (droit sur cet outil), l'identité est rattachée au membre local **de même e-mail** (hors invités externes, aucun compte créé) via une session locale de 2 h renouvelée en silence. Hors passerelle : sans effet. Test : `tests/gateway-bridge.test.js`.
+
+- Sécurité (branche `claude/security-fixes`) : derrière la passerelle, la création du premier compte exige le droit admin de la passerelle (plus de course au premier visiteur ; hors passerelle : inchangé, test `gateway-setup`) ; dépendances à jour (`npm audit` : 0). Nodemailer passé de 6.x à 10.x : à valider sur un envoi réel (SMTP/sendmail).
