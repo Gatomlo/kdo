@@ -50,4 +50,8 @@ if (require.main === module) {
   app.listen(PORT, () => console.log(`Kdo : http://localhost:${PORT}/`));
 }
 
+// Liste des comptes pour l'administration de node-gateway (lecture seule, facultatif : voir node-gateway/README).
+app.gatewayAccounts = () => require('./lib/db').db.prepare('SELECT name, email, is_admin FROM members WHERE email IS NOT NULL AND guest_list_id IS NULL ORDER BY name').all()
+  .map((m) => ({ key: m.email, email: m.email, name: m.name, detail: m.is_admin ? 'administrateur du cercle' : 'membre' }));
+
 module.exports = app;
