@@ -400,7 +400,7 @@ define('ajouter', {
         <div class="card stack art-new">
           <div class="art-img" id="q-img"><span aria-hidden="true">🎁</span></div>
           <input type="hidden" name="image">
-          <label>Nom<input name="title" required maxlength="200" value="${esc(sh ? sh.title : '')}" placeholder="Kit potager d’intérieur"></label>
+          <label>Nom<input name="title" required maxlength="200" data-fallback="${esc(sh ? sh.title : '')}" placeholder="Kit potager d’intérieur"></label>
           <label>Prix indicatif (€)<input name="price" inputmode="decimal" placeholder="35"></label>
         </div>
         <div class="stack"><span class="lbl-title">Dans quelle liste ?</span>
@@ -465,8 +465,12 @@ async function quickPreview() {
       form.image.value = r.image;
       document.getElementById('q-img').innerHTML = `<img src="${esc(r.image)}" alt="" referrerpolicy="no-referrer">`;
     }
+    if (!r.title && !form.title.value && form.title.dataset.fallback) form.title.value = form.title.dataset.fallback;
     hint.textContent = r.title || r.image ? '✓ Trouvé automatiquement : vérifie avant d’ajouter.' : 'Rien trouvé sur cette page : remplis à la main.';
-  } catch (e) { hint.textContent = `Impossible de lire cette page (${e.message})`; previewed = ''; }
+  } catch (e) {
+    if (!form.title.value && form.title.dataset.fallback) form.title.value = form.title.dataset.fallback;
+    hint.textContent = `Impossible de lire cette page (${e.message})`; previewed = '';
+  }
 }
 on('change', 'quick-url', () => quickPreview());
 on('click', 'quick-paste', async () => {

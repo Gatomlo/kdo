@@ -140,7 +140,7 @@ async function boot() {
   // Page partagee depuis le telephone vers l'app installee (manifest share_target) :
   // le lien est parfois seul dans « texte ».
   const sharedText = `${params.get('texte') || ''} ${params.get('partage-url') || ''}`;
-  const sharedUrl = params.get('partage-url') || (sharedText.match(/https?:\/\/\S+/) || [])[0];
+  const sharedUrl = params.get('partage-url') || ((sharedText.match(/https?:\/\/[^\s<>"]+/) || [])[0] || '').replace(/[).,;!?»]+$/, '');
   if (sharedUrl) { S.q.shared = { url: sharedUrl, title: params.get('titre') || '' }; location.hash = '#/ajouter'; }
   if (login || params.get('invite') || params.get('reset') || params.get('partage') || sharedUrl) history.replaceState(null, '', location.pathname + location.hash);
   await loadOptions();
