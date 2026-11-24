@@ -396,7 +396,7 @@ define('ajouter', {
     return {
       title: 'Nouveau souhait', back: '#/', tab: 'listes',
       fab: { href: '#/listes/nouvelle', label: 'Nouvelle liste' },
-      after: () => { if (sh) quickPreview(); },
+      after: () => { quickCategories(); if (sh) quickPreview(); },
       body: mine.length ? `<form class="stack-lg" data-f="quick-add">
         <div class="stack"><label for="q-url">Lien du produit</label>
           <div class="paste"><input id="q-url" name="url" type="url" value="${esc(sh ? sh.url : '')}" placeholder="Colle un lien, on s’occupe du reste" data-ch="quick-url">
@@ -407,6 +407,7 @@ define('ajouter', {
           <input type="hidden" name="image">
           <label>Nom<input name="title" required maxlength="200" value="${esc(sh ? sh.title : '')}" ${sh && sh.title ? 'data-auto="1"' : ''} data-in="quick-title" placeholder="Kit potager d’intérieur"></label>
           <label>Prix indicatif (€)<input name="price" inputmode="decimal" placeholder="35"></label>
+          <label id="q-cat" hidden>Catégorie<select name="categoryId"></select></label>
         </div>
         <div class="stack"><span class="lbl-title">Dans quelle liste ?</span>
           <input type="hidden" name="listId" value="${first ? first.id : ''}">
@@ -451,7 +452,25 @@ on('click', 'quick-list-set', (el) => {
   form.listId.value = l.id;
   form.querySelector('.list-pick').innerHTML = `${listChoice(l)}<span class="chev" aria-hidden="true">›</span>`;
   closeSheet();
+  quickCategories();
 });
+// Catégorie : propre à chaque liste, donc le choix suit la liste sélectionnée (masqué si elle n'en a pas).
+async function quickCategories() {
+  const form = document.querySelector('form[data-f=quick-add]');
+  const box = document.getElementById('q-cat');
+  if (!form || !box) return;
+  const id = form.listId.value;
+  box.hidden = true;
+  form.categoryId.innerHTML = '';
+  if (!id) return;
+  try {
+    const cats = (await get(`lists/${id}`)).categories;
+    if (form.listId.value !== id) return; // une autre liste a été choisie entre-temps
+    if (!cats.length) return;
+    form.categoryId.innerHTML = `<option value="">— aucune —</option>${cats.map((c) => `<option value="${c.id}">${esc(c.name)}</option>`).join('')}`;
+    box.hidden = false;
+  } catch { /* la catégorie reste facultative */ }
+}
 let previewed = '';
 async function quickPreview() {
   const form = document.querySelector('form[data-f=quick-add]');
@@ -487,7 +506,7 @@ on('click', 'quick-more', () => {
   go(`#/listes/${form.listId.value}/article/nouveau`);
 });
 on('submit', 'quick-add', async (form, f) => {
-  const r = await attempt(() => post(`lists/${f.listId}/items`, { title: f.title, url: f.url, price: f.price, image: f.image, description: f.description, priority: Number(f.priority), quantity: 1 }));
+  const r = await attempt(() => post(`lists/${f.listId}/items`, { title: f.title, url: f.url, price: f.price, image: f.image, description: f.description, priority: Number(f.priority), quantity: 1, categoryId: f.categoryId || null }));
   if (r) {
     previewed = '';
     try { localStorage.setItem('kdo-last-list', f.listId); } catch { /* stockage indisponible */ }
