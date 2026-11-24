@@ -233,7 +233,8 @@ function pushSection(info) {
     body = `<p class="small muted">Reçois sur ce téléphone ou cet ordinateur : enveloppe Secret Santa, article réservé modifié, anniversaire qui approche, question de ton Secret Santa…${info.devices ? ` <b>${info.devices} appareil${info.devices > 1 ? 's' : ''} abonné${info.devices > 1 ? 's' : ''}.</b>` : ''}</p>
       <div class="row wrap"><button class="btn main" data-a="push-on">🔔 Activer sur cet appareil</button>${info.devices ? '<button class="btn ghost" data-a="push-test">Essayer</button><button class="btn ghost" data-a="push-off">Désactiver ici</button>' : ''}</div>`;
   }
-  return `<section class="card stack"><h2>🔔 Notifications</h2>${body}</section>`;
+  return `<section class="card stack"><h2>🔔 Notifications</h2>${body}
+    <p class="small"><a href="#/abonnements">Mes abonnements</a> : listes et personnes suivies, récap quotidien ou hebdomadaire.</p></section>`;
 }
 const b64ToBytes = (b64) => {
   const s = atob((b64 + '='.repeat((4 - (b64.length % 4)) % 4)).replace(/-/g, '+').replace(/_/g, '/'));

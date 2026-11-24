@@ -5,9 +5,11 @@ const { start, family } = require('./helpers');
 const push = require('../lib/push');
 const { db } = require('../lib/db');
 
+let ctx; // le serveur et la famille sont partages par les deux tests du fichier
 test('abonnement a une liste', async () => {
   const server = await start();
   const f = await family();
+  ctx = { server, f };
   const sub = (id) => ({ endpoint: `https://push.exemple.be/${id}`, keys: { p256dh: 'BPk', auth: 'xyz' } });
   await f.thomas.post('/api/push/subscribe', { subscription: sub('t') });
   const lid = (await f.lea.post('/api/lists', { title: 'Noël Léa' })).data.id;
@@ -60,5 +62,81 @@ test('abonnement a une liste', async () => {
   const n = push.outbox.length;
   await f.lea.post(`/api/lists/${lid}/items`, { title: 'Plante' });
   assert.equal(push.outbox.length, n);
+});
+
+test('choix des evenements, suivi d\'une personne, recap et mes abonnements', async () => {
+  const { server, f } = ctx;
+  const from = push.outbox.length;
+  const sub = (id) => ({ endpoint: `https://push.exemple.be/x${id}`, keys: { p256dh: 'BPk', auth: 'xyz' } });
+  await f.thomas.post('/api/push/subscribe', { subscription: sub('t2') });
+  await f.marc.post('/api/push/subscribe', { subscription: sub('m') });
+  const mine = (id) => push.outbox.slice(from).filter((m) => m.memberId === id);
+  const lid = (await f.lea.post('/api/lists', { title: 'Anniv' })).data.id;
+  const add = async (title) => (await f.lea.post(`/api/lists/${lid}/items`, { title })).data.id;
+  const reset = () => db.prepare('UPDATE list_follows SET last_sent = 0').run();
+
+  // « Cadeaux pris » seulement : un ajout ne dit rien, une réservation oui.
+  assert.equal((await f.thomas.put(`/api/lists/${lid}/follow`, { events: 'taken' })).data.follow.events, 'taken');
+  const first = await add('Montre');
+  assert.equal(mine(f.ids.thomas).length, 0);
+  await f.marc.post(`/api/items/${first}/reserve`, {});
+  assert.equal(mine(f.ids.thomas).length, 1);
+  // « Nouveaux cadeaux » seulement : l'inverse.
+  await f.thomas.put(`/api/lists/${lid}/follow`, { events: 'add' });
+  await add('Sac');
+  assert.equal(mine(f.ids.thomas).length, 2);
+  const second = await add('Gants'); // 2e ajout dans la fenêtre : en attente
+  reset();
+  await f.marc.post(`/api/items/${second}/reserve`, {});
+  await new Promise((r) => setTimeout(r, 50));
+  const got = mine(f.ids.thomas); // seul le lot « Gants » est parti, pas d'avis de réservation
+  assert.equal(got.length, 3);
+  assert.equal(got.some((m) => /a pris/.test(m.title) && /Gants/.test(m.title)), false);
+
+  // Suivre la personne : toutes ses listes, y compris une liste créée ensuite ; exclusion possible.
+  await f.thomas.put(`/api/lists/${lid}/follow`, { events: 'off' });
+  assert.equal((await f.thomas.put(`/api/members/${f.ids.lea}/follow`, { events: 'both' })).status, 200);
+  assert.equal((await f.thomas.put(`/api/members/${f.ids.thomas}/follow`, { events: 'both' })).status, 400);
+  const lid2 = (await f.lea.post('/api/lists', { title: 'Noël' })).data.id;
+  const n = mine(f.ids.thomas).length;
+  await f.lea.post(`/api/lists/${lid2}/items`, { title: 'Livre' });
+  assert.equal(mine(f.ids.thomas).length, n + 1);
+  const view = (await f.thomas.get(`/api/lists/${lid2}`)).data;
+  assert.equal(view.follow.scope, 'person');
+  assert.equal(view.ownerFollow, 'both');
+  await f.thomas.put(`/api/lists/${lid2}/follow`, { events: 'off' }); // exclue
+  reset();
+  await f.lea.post(`/api/lists/${lid2}/items`, { title: 'Stylo' });
+  assert.equal(mine(f.ids.thomas).length, n + 1);
+
+  // Mes abonnements, puis récap quotidien : tout est mis en file, envoyé en un message.
+  const abo = (await f.thomas.get('/api/follows')).data;
+  assert.deepEqual(abo.people.map((p) => p.name), ['Léa']);
+  assert.equal(abo.lists.some((l) => l.id === lid2), false);
+  await f.thomas.put(`/api/lists/${lid2}/follow`, { events: 'both' });
+  assert.equal((await f.thomas.put('/api/follows/digest', { mode: 'daily' })).status, 200);
+  reset();
+  const before = mine(f.ids.thomas).length;
+  await f.lea.post(`/api/lists/${lid2}/items`, { title: 'Carnet' });
+  await f.lea.post(`/api/lists/${lid2}/items`, { title: 'Bougie' });
+  assert.equal(mine(f.ids.thomas).length, before, 'rien tant que le récap n’est pas dû');
+  db.prepare('UPDATE members SET follow_digest_at = 0 WHERE id = ?').run(f.ids.thomas);
+  await f.thomas.get('/api/me');
+  await new Promise((r) => setTimeout(r, 50));
+  const recap = mine(f.ids.thomas).slice(before);
+  assert.equal(recap.length, 1);
+  assert.match(recap[0].title, /Récap/);
+  assert.match(recap[0].body, /Carnet/);
+
+  // La suppression part toujours tout de suite, même en mode récap.
+  const gift = await add('Cravate');
+  const b = mine(f.ids.thomas).length;
+  await f.lea.del(`/api/items/${gift}`);
+  assert.equal(mine(f.ids.thomas).slice(b).filter((m) => /retiré/.test(m.title)).length, 1);
+
+  // Tout désabonner.
+  assert.equal((await f.thomas.del('/api/follows')).status, 200);
+  const none = (await f.thomas.get('/api/follows')).data;
+  assert.deepEqual([none.lists.length, none.people.length], [0, 0]);
   server.close();
 });

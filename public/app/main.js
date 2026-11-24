@@ -15,6 +15,7 @@ import './cadeaux.js';
 import './recherche.js';
 import './journal.js';
 import './corbeille.js';
+import './abonnements.js';
 import './plateforme.js';
 
 const app = document.getElementById('app');
@@ -141,7 +142,10 @@ async function boot() {
   // le lien est parfois seul dans « texte ».
   const sharedText = `${params.get('texte') || ''} ${params.get('partage-url') || ''}`;
   const sharedUrl = params.get('partage-url') || (sharedText.match(/https?:\/\/\S+/) || [])[0];
-  if (sharedUrl) { S.q.shared = { url: sharedUrl, title: params.get('titre') || '' }; location.hash = '#/ajouter'; }
+  // Titre de repli (quand la page bloque l'aperçu) : « titre », sinon le texte partagé sans son lien
+  // (beaucoup d'apps y mettent le nom du produit).
+  const textName = (params.get('texte') || '').replace(/https?:\/\/\S+/g, '').replace(/\s+/g, ' ').trim();
+  if (sharedUrl) { S.q.shared = { url: sharedUrl, title: (params.get('titre') || textName).slice(0, 200) }; location.hash = '#/ajouter'; }
   if (login || params.get('invite') || params.get('reset') || params.get('partage') || sharedUrl) history.replaceState(null, '', location.pathname + location.hash);
   await loadOptions();
   let loginError = null;

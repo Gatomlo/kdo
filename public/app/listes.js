@@ -139,11 +139,14 @@ define('listes/:id', {
             <p class="meta grow">${avatar(owner, 'sm')} ${esc(owner.name)}${d.roles.filter((r) => r.role === 'co_owner').map((r) => ` & ${esc(r.name)}`).join('')}${list.date ? ` · ${fmtDate(list.date, { day: 'numeric', month: 'short' })}` : ''}
               ${list.archived ? '<span class="pill p-buy">archivée</span>' : ''}${d.canSeeGifts ? `<span class="pill p-hide" title="Ne montre pas cet écran à ${esc(owner.name)}">🤫 caché à ${esc(owner.name)}</span>` : '<span class="pill p-mgr" title="Les réservations te restent cachées">🙈 sans spoiler</span>'}</p>
             ${d.canEdit && !d.guest && !list.archived ? '<button class="ib" data-a="list-share" aria-label="Partager" title="Partager"><span aria-hidden="true">🔗</span><span class="lbl">Partager</span></button>' : ''}
-            ${d.canSeeGifts && !d.guest ? `<button class="ib" data-a="list-follow" aria-pressed="${!!d.following}" aria-label="${d.following ? 'Ne plus être prévenu·e des nouveaux cadeaux' : 'Être prévenu·e des nouveaux cadeaux'}" title="${d.following ? 'Abonné·e : touche pour te désabonner' : 'Être prévenu·e des nouveaux cadeaux'}"><span aria-hidden="true">${d.following ? '🔔' : '🔕'}</span><span class="lbl">${d.following ? 'Abonné·e' : 'Suivre'}</span></button>` : ''}
+            ${d.canSeeGifts && !d.guest ? `<button class="ib" data-a="list-follow" aria-haspopup="dialog" aria-label="${d.following ? 'Abonné·e à cette liste : modifier' : 'Être prévenu·e des nouveaux cadeaux'}" title="${d.following ? 'Abonné·e : modifier' : 'Être prévenu·e des nouveaux cadeaux'}"><span aria-hidden="true">${d.following ? '🔔' : '🔕'}</span><span class="lbl">${d.following ? 'Abonné·e' : 'Suivre'}</span></button>` : ''}
             ${hasInfo ? `<button class="ib" data-a="list-info" aria-expanded="${!!q.info}" aria-label="Informations" title="Informations">ℹ️</button>` : ''}</div>
           ${info}
           ${progress ? `<div class="progress">${progress}</div>` : ''}
         </header>
+        ${d.canSeeGifts && !d.guest && !d.follow && !list.archived && d.items.some((i) => i.gifts && i.gifts.reservations.some((r) => r.mine)) && !followDeclined(list.id)
+          ? `<div class="card stack tight"><p>🔔 Être prévenu·e quand d’autres cadeaux sont pris ou ajoutés sur cette liste ?</p>
+            <div class="row"><button class="btn sm main" data-a="follow-yes">Oui, me prévenir</button><button class="btn sm ghost" data-a="follow-no">Non merci</button></div></div>` : ''}
         ${chips}
         ${groups.length ? groups.map((g) => `<section class="stack">${g.name ? `<h3 class="tag">${esc(g.name)}</h3>` : ''}${g.items.map((i) => itemCard(i, d)).join('')}</section>`).join('')
           : empty(d.items.length ? 'Aucun article ne correspond aux filtres.' : d.canEdit ? 'Cette liste est encore vide : touche « + Article ».' : 'Cette liste est encore vide.')}
@@ -156,9 +159,35 @@ on('click', 'f-cat', (el) => {
   if (el.dataset.v === 'all') { S.q.cat = 'all'; S.q.free = false; S.q.prio = 0; S.q.budget = null; S.q.sort = null; } else S.q.cat = S.q.cat === Number(el.dataset.v) ? 'all' : Number(el.dataset.v);
   render();
 });
-on('click', 'list-follow', async () => {
+// Suivre une liste : quels evenements (nouveaux cadeaux / cadeaux pris), ou toutes les listes de la personne.
+const FOLLOW = [['both', 'Tout', 'Nouveaux cadeaux et cadeaux pris'], ['add', 'Nouveaux cadeaux', 'Quand un article est ajouté'], ['taken', 'Cadeaux pris', 'Quand quelqu’un réserve un article']];
+const followDeclined = (id) => { try { return JSON.parse(localStorage.getItem('kdo-follow-no') || '[]').includes(id); } catch { return false; } };
+on('click', 'list-follow', () => {
   const d = S.data;
-  if (await attempt(() => put(`lists/${d.list.id}/follow`, { on: !d.following }))) { toast(d.following ? 'Abonnement retiré' : 'Tu seras prévenu·e des nouveaux cadeaux'); reload(); }
+  const cur = d.follow ? d.follow.events : 'off';
+  const opt = ([v, t, h]) => `<button class="list-opt" data-a="follow-set" data-v="${v}" aria-pressed="${cur === v}"><span class="grow"><b>${t}</b><span class="meta">${h}</span></span></button>`;
+  sheet(`<h3>🔔 Suivre cette liste</h3>
+    <div class="stack tight list-opts">${FOLLOW.map(opt).join('')}${d.follow ? opt(['off', 'Ne plus suivre', 'Plus aucune notification pour cette liste']) : ''}</div>
+    <p class="small muted">Tu es toujours prévenu·e si un article est supprimé, pour ne pas acheter un cadeau qui n’est plus souhaité. <a href="#/abonnements">Mes abonnements</a></p>
+    <label class="row" style="flex-direction:row;align-items:center;gap:.6rem;font-weight:500"><input type="checkbox" data-ch="follow-person" ${d.ownerFollow ? 'checked' : ''}> <span>Suivre toutes les listes de ${esc(d.owner.name)}, y compris les prochaines</span></label>`, null, 'picker');
+});
+on('click', 'follow-set', async (el) => {
+  const d = S.data;
+  closeSheet();
+  if (await attempt(() => put(`lists/${d.list.id}/follow`, { events: el.dataset.v }))) { toast(el.dataset.v === 'off' ? 'Abonnement retiré' : 'Tu seras prévenu·e'); reload(); }
+});
+on('change', 'follow-person', async (el) => {
+  const d = S.data;
+  closeSheet();
+  if (await attempt(() => put(`members/${d.owner.id}/follow`, { events: el.checked ? (d.follow ? d.follow.events : 'both') : 'off' }))) { toast(el.checked ? `Tu suis les listes de ${d.owner.name}` : 'Suivi retiré'); reload(); }
+});
+// Proposition apres une reservation : etre prevenu des autres cadeaux de cette liste.
+on('click', 'follow-yes', async () => {
+  if (await attempt(() => put(`lists/${S.data.list.id}/follow`, { events: 'both' }))) { toast('Tu seras prévenu·e'); reload(); }
+});
+on('click', 'follow-no', () => {
+  try { localStorage.setItem('kdo-follow-no', JSON.stringify([...JSON.parse(localStorage.getItem('kdo-follow-no') || '[]'), S.data.list.id].slice(-100))); } catch { /* stockage indisponible */ }
+  render();
 });
 on('click', 'list-info', () => { S.q.info = !S.q.info; render(); });
 on('click', 'item-open', (el) => openItem(Number(el.dataset.id)));
