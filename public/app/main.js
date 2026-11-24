@@ -151,7 +151,18 @@ async function boot() {
   if (!S.me) S.me = await get('me').catch(() => null);
   await Promise.all([loadInvitation(), loadShare()]);
   await load();
+  resyncPush();
   if (loginError && !S.me) toast(loginError, true);
+}
+// Notifications : a chaque ouverture, l'abonnement de l'appareil est renvoye au serveur (sans effet s'il
+// est deja connu). Le garde au fil des mises a jour et apres une restauration de la base ou un
+// abonnement supprime par erreur ; rien n'est demande a la personne.
+async function resyncPush() {
+  try {
+    if (!S.me || S.me.guest || !('PushManager' in window) || Notification.permission !== 'granted') return;
+    const sub = await (await navigator.serviceWorker.ready).pushManager.getSubscription();
+    if (sub) await post('push/subscribe', { subscription: sub.toJSON() });
+  } catch { /* facultatif : sans reseau ou invite */ }
 }
 boot();
 

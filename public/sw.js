@@ -2,7 +2,7 @@
 // (/kdo/ dans la passerelle). L'API n'est jamais mise en cache (donnees toujours
 // fraiches : une reservation doit etre vue tout de suite par les autres offrants).
 // Changer VERSION quand la liste des fichiers change.
-const VERSION = 'kdo-v21';
+const VERSION = 'kdo-v22';
 const FILES = [
   './', 'style.css', 'manifest.json', 'icon.svg', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'apple-touch-icon.png', 'favicon-32.png',
   'app/main.js', 'app/ui.js', 'app/api.js', 'app/state.js', 'app/router.js', 'app/cards.js', 'app/connexion.js',
@@ -32,6 +32,23 @@ self.addEventListener('notificationclick', (e) => {
     if (c) return c.navigate(target).then((w) => (w || c).focus());
     return self.clients.openWindow(target);
   }));
+});
+
+// Le navigateur a renouvele l'abonnement (nouvelle adresse) : on le renvoie au serveur pour que les
+// notifications continuent sans que la personne ait quoi que ce soit a refaire.
+self.addEventListener('pushsubscriptionchange', (e) => {
+  e.waitUntil((async () => {
+    try {
+      const headers = { 'content-type': 'application/json' };
+      let sub = e.newSubscription || await self.registration.pushManager.getSubscription();
+      if (!sub) {
+        const key = (await (await fetch('api/push', { headers, credentials: 'same-origin' })).json()).publicKey;
+        const raw = atob((key + '='.repeat((4 - (key.length % 4)) % 4)).replace(/-/g, '+').replace(/_/g, '/'));
+        sub = await self.registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: Uint8Array.from(raw, (c) => c.charCodeAt(0)) });
+      }
+      await fetch('api/push/subscribe', { method: 'POST', headers, credentials: 'same-origin', body: JSON.stringify({ subscription: sub.toJSON() }) });
+    } catch { /* sans session : la prochaine ouverture de l'app renverra l'abonnement */ }
+  })());
 });
 
 // Reseau d'abord (3 s au plus), sinon la copie gardee. API et autres sites : pas d'intervention.
