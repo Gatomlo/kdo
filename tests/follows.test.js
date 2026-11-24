@@ -32,8 +32,23 @@ test('abonnement a une liste', async () => {
   await new Promise((r) => setTimeout(r, 50));
   assert.equal(push.outbox.slice(before).filter((m) => m.memberId === f.ids.thomas).length, 2);
 
+  // Cadeau pris : les abonnés sont prévenus, pas celui qui le prend ; jamais le destinataire.
+  await f.thomas.put(`/api/lists/${lid}/follow`, { on: true });
+  await f.marc.put(`/api/lists/${lid}/follow`, { on: true });
+  await f.marc.post('/api/push/subscribe', { subscription: sub('m') });
+  await f.lea.post('/api/push/subscribe', { subscription: sub('l') });
+  const itemId = (await f.lea.post(`/api/lists/${lid}/items`, { title: 'Écharpe' })).data.id;
+  const b2 = push.outbox.length;
+  assert.equal((await f.marc.post(`/api/items/${itemId}/reserve`, {})).status, 201);
+  const taken = push.outbox.slice(b2);
+  assert.deepEqual(taken.map((m) => m.memberId), [f.ids.thomas]);
+  assert.match(taken[0].title, /Marc a pris/);
+  assert.equal(taken.some((m) => m.memberId === f.ids.lea), false);
+
   // Un autre abonné ne reçoit rien tant qu'il ne s'abonne pas ; se désabonner arrête tout.
   assert.equal((await f.thomas.put(`/api/lists/${lid}/follow`, { on: false })).data.following, false);
+  await f.marc.put(`/api/lists/${lid}/follow`, { on: false });
+  db.prepare('UPDATE list_follows SET last_sent = 0').run();
   const n = push.outbox.length;
   await f.lea.post(`/api/lists/${lid}/items`, { title: 'Plante' });
   assert.equal(push.outbox.length, n);
