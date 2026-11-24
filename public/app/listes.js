@@ -139,6 +139,7 @@ define('listes/:id', {
             <p class="meta grow">${avatar(owner, 'sm')} ${esc(owner.name)}${d.roles.filter((r) => r.role === 'co_owner').map((r) => ` & ${esc(r.name)}`).join('')}${list.date ? ` · ${fmtDate(list.date, { day: 'numeric', month: 'short' })}` : ''}
               ${list.archived ? '<span class="pill p-buy">archivée</span>' : ''}${d.canSeeGifts ? `<span class="pill p-hide" title="Ne montre pas cet écran à ${esc(owner.name)}">🤫 caché à ${esc(owner.name)}</span>` : '<span class="pill p-mgr" title="Les réservations te restent cachées">🙈 sans spoiler</span>'}</p>
             ${d.canEdit && !d.guest && !list.archived ? '<button class="ib" data-a="list-share" aria-label="Partager" title="Partager"><span aria-hidden="true">🔗</span><span class="lbl">Partager</span></button>' : ''}
+            ${d.canSeeGifts && !d.guest ? `<button class="ib" data-a="list-follow" aria-pressed="${!!d.following}" aria-label="${d.following ? 'Ne plus être prévenu·e des nouveaux cadeaux' : 'Être prévenu·e des nouveaux cadeaux'}" title="${d.following ? 'Abonné·e : touche pour te désabonner' : 'Être prévenu·e des nouveaux cadeaux'}"><span aria-hidden="true">${d.following ? '🔔' : '🔕'}</span><span class="lbl">${d.following ? 'Abonné·e' : 'Suivre'}</span></button>` : ''}
             ${hasInfo ? `<button class="ib" data-a="list-info" aria-expanded="${!!q.info}" aria-label="Informations" title="Informations">ℹ️</button>` : ''}</div>
           ${info}
           ${progress ? `<div class="progress">${progress}</div>` : ''}
@@ -154,6 +155,10 @@ define('listes/:id', {
 on('click', 'f-cat', (el) => {
   if (el.dataset.v === 'all') { S.q.cat = 'all'; S.q.free = false; S.q.prio = 0; S.q.budget = null; S.q.sort = null; } else S.q.cat = S.q.cat === Number(el.dataset.v) ? 'all' : Number(el.dataset.v);
   render();
+});
+on('click', 'list-follow', async () => {
+  const d = S.data;
+  if (await attempt(() => put(`lists/${d.list.id}/follow`, { on: !d.following }))) { toast(d.following ? 'Abonnement retiré' : 'Tu seras prévenu·e des nouveaux cadeaux'); reload(); }
 });
 on('click', 'list-info', () => { S.q.info = !S.q.info; render(); });
 on('click', 'item-open', (el) => openItem(Number(el.dataset.id)));
