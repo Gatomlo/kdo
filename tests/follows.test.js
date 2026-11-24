@@ -45,6 +45,14 @@ test('abonnement a une liste', async () => {
   assert.match(taken[0].title, /Marc a pris/);
   assert.equal(taken.some((m) => m.memberId === f.ids.lea), false);
 
+  // Article supprimé : l'abonné (non offrant) est prévenu, l'offrant (Marc) une seule fois.
+  const b3 = push.outbox.length;
+  assert.equal((await f.lea.del(`/api/items/${itemId}`)).status, 200);
+  const gone = push.outbox.slice(b3);
+  assert.equal(gone.filter((m) => m.memberId === f.ids.thomas && /retiré/.test(m.title)).length, 1);
+  assert.equal(gone.filter((m) => m.memberId === f.ids.marc).length, 1);
+  assert.equal(gone.some((m) => m.memberId === f.ids.lea), false);
+
   // Un autre abonné ne reçoit rien tant qu'il ne s'abonne pas ; se désabonner arrête tout.
   assert.equal((await f.thomas.put(`/api/lists/${lid}/follow`, { on: false })).data.following, false);
   await f.marc.put(`/api/lists/${lid}/follow`, { on: false });
