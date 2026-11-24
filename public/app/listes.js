@@ -405,7 +405,7 @@ define('ajouter', {
         <div class="card stack art-new">
           <div class="art-img" id="q-img"><span aria-hidden="true">🎁</span></div>
           <input type="hidden" name="image">
-          <label>Nom<input name="title" required maxlength="200" value="${esc(sh ? sh.title : '')}" placeholder="Kit potager d’intérieur"></label>
+          <label>Nom<input name="title" required maxlength="200" value="${esc(sh ? sh.title : '')}" ${sh && sh.title ? 'data-auto="1"' : ''} data-in="quick-title" placeholder="Kit potager d’intérieur"></label>
           <label>Prix indicatif (€)<input name="price" inputmode="decimal" placeholder="35"></label>
         </div>
         <div class="stack"><span class="lbl-title">Dans quelle liste ?</span>
@@ -464,7 +464,9 @@ async function quickPreview() {
   hint.textContent = 'Lecture de la page…';
   try {
     const r = await linkPreview(url);
-    if (r.title && !form.title.value) form.title.value = r.title;
+    // Titre venu du menu « Partager » = provisoire (souvent le nom du site) : l'aperçu le remplace
+    // tant que la personne n'y a pas touché.
+    if (r.title && (!form.title.value || form.title.dataset.auto)) { form.title.value = r.title; delete form.title.dataset.auto; }
     if (r.price && !form.price.value) form.price.value = r.price;
     if (r.image) {
       form.image.value = r.image;
@@ -473,6 +475,7 @@ async function quickPreview() {
     hint.textContent = r.title || r.image ? '✓ Trouvé automatiquement : vérifie avant d’ajouter.' : 'Rien trouvé sur cette page : remplis à la main.';
   } catch (e) { hint.textContent = `Impossible de lire cette page (${e.message})`; previewed = ''; }
 }
+on('input', 'quick-title', (el) => { delete el.dataset.auto; });
 on('change', 'quick-url', () => quickPreview());
 on('click', 'quick-paste', async () => {
   const input = document.getElementById('q-url');
